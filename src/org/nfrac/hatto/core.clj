@@ -1,4 +1,4 @@
-(ns org.nfrac.ight.core
+(ns org.nfrac.hatto.core
   (:require [org.nfrac.cljbox2d.testbed :as bed]
             [cljbox2d.core :refer :all]
             [cljbox2d.joints :refer :all]
@@ -145,7 +145,7 @@
   "Run the test sketch."
   [& args]
   (quil/defsketch test-sketch
-    :title "Ight"
+    :title "Hatto"
     :setup setup
     :update step
     :draw bed/draw
