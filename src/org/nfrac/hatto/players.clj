@@ -4,6 +4,14 @@
             [cljbox2d.joints :refer :all]
             [cljbox2d.vec2d :refer [v-add]]))
 
+(defn revo-joint!
+  [body-a body-b world-anchor]
+  (joint! {:type :revolute
+           :body-a body-a
+           :body-b body-b
+           :world-anchor world-anchor
+           :max-motor-torque 1000}))
+
 (defn nin
   [world position group-index]
   (let [head (body! world {:position position}
@@ -18,20 +26,10 @@
                 :group-index group-index}
         ;; first vertex internal so not a Point Of Interest
         tri-pois (drop 1 tri-pts)
-        limb-a (body! world {:position position}
-                      tri-fx)
-        limb-b (body! world {:position position}
-                      tri-fx)
-        rj-a (joint! {:type :revolute
-                      :body-a limb-a
-                      :body-b head
-                      :world-anchor position
-                      :max-motor-torque 1000})
-        rj-b (joint! {:type :revolute
-                      :body-a limb-b
-                      :body-b head
-                      :world-anchor position
-                      :max-motor-torque 1000})]
+        limb-a (body! world {:position position} tri-fx)
+        limb-b (body! world {:position position} tri-fx)
+        rj-a (revo-joint! limb-a head position)
+        rj-b (revo-joint! limb-b head position)]
     {:entity-type :nin
      :limbs {:head (->BodyPois head [[0 0]])
              :limb-a (->BodyPois limb-a tri-pois)
@@ -51,36 +49,16 @@
         thigh-fx {:shape (rod [0 0] 0 len 0.1)
                   :density 10
                   :group-index group-index}
-        limb-a1 (body! world {:position position}
-                       thigh-fx)
-        limb-b1 (body! world {:position position}
-                       thigh-fx)
-        rj-a1 (joint! {:type :revolute
-                       :body-a limb-a1
-                       :body-b head
-                       :world-anchor position
-                       :max-motor-torque 1000})
-        rj-b1 (joint! {:type :revolute
-                       :body-a limb-b1
-                       :body-b head
-                       :world-anchor position
-                       :max-motor-torque 1000})
+        limb-a1 (body! world {:position position} thigh-fx)
+        limb-b1 (body! world {:position position} thigh-fx)
+        rj-a1 (revo-joint! limb-a1 head position)
+        rj-b1 (revo-joint! limb-b1 head position)
         calf-fx thigh-fx
         calf-pos (v-add position [len 0.0])
-        limb-a2 (body! world {:position calf-pos}
-                       calf-fx)
-        limb-b2 (body! world {:position calf-pos}
-                       calf-fx)
-        rj-a2 (joint! {:type :revolute
-                       :body-a limb-a2
-                       :body-b limb-a1
-                       :world-anchor calf-pos
-                       :max-motor-torque 1000})
-        rj-b2 (joint! {:type :revolute
-                       :body-a limb-b2
-                       :body-b limb-b1
-                       :world-anchor calf-pos
-                       :max-motor-torque 1000})]
+        limb-a2 (body! world {:position calf-pos} calf-fx)
+        limb-b2 (body! world {:position calf-pos} calf-fx)
+        rj-a2 (revo-joint! limb-a1 limb-a2 calf-pos)
+        rj-b2 (revo-joint! limb-b1 limb-b2 calf-pos)]
     {:entity-type :legge
      :limbs {:head (->BodyPois head [[0 0]])
              :limb-a1 (->BodyPois limb-a1 limb-pois)
@@ -94,4 +72,65 @@
 
 (defn hatto
   [world position group-index]
-  )
+  (let [head (body! world {:position position}
+                    {:shape (circle 0.5)
+                     :density 10
+                     :group-index group-index})
+        thigh-len 1.0
+        thigh-pois [[0.0 0.0]
+                    [0.0 thigh-len]]
+        thigh-fx {:shape (rod [0 0] 0 thigh-len 0.1)
+                  :density 10
+                  :group-index group-index}
+        limb-a (body! world {:position position} thigh-fx)
+        limb-b (body! world {:position position} thigh-fx)
+        rj-a (revo-joint! limb-a head position)
+        rj-b (revo-joint! limb-b head position)
+        calf-pos (v-add position [thigh-len 0.0])
+        calf-len (* thigh-len 0.67)
+        calf-pois [[0.0 0.0]
+                   [0.0 calf-len]]
+        calf-fx (assoc thigh-fx :shape (rod [0 0] 0 calf-len 0.1))
+        limb-aa (body! world {:position calf-pos} calf-fx)
+        limb-ab (body! world {:position calf-pos} calf-fx)
+        limb-ba (body! world {:position calf-pos} calf-fx)
+        rj-aa (revo-joint! limb-aa limb-a calf-pos)
+        rj-ab (revo-joint! limb-ab limb-a calf-pos)
+        rj-ba (revo-joint! limb-ba limb-b calf-pos)
+        toe-pos (v-add calf-pos [calf-len 0.0])
+        toe-len (* calf-len 0.67)
+        toe-pois [[0.0 0.0]
+                  [0.0 toe-len]]
+        toe-fx (assoc calf-fx :shape (rod [0 0] 0 toe-len 0.1))
+        limb-aaa (body! world {:position toe-pos} toe-fx)
+        limb-aab (body! world {:position toe-pos} toe-fx)
+        limb-aba (body! world {:position toe-pos} toe-fx)
+        limb-abb (body! world {:position toe-pos} toe-fx)
+        limb-baa (body! world {:position toe-pos} toe-fx)
+        rj-aaa (revo-joint! limb-aaa limb-aa toe-pos)
+        rj-aab (revo-joint! limb-aab limb-aa toe-pos)
+        rj-aba (revo-joint! limb-aba limb-ab toe-pos)
+        rj-abb (revo-joint! limb-abb limb-ab toe-pos)
+        rj-baa (revo-joint! limb-baa limb-ba toe-pos)]
+    {:entity-type :hatto
+     :limbs {:head (->BodyPois head [[0 0]])
+             :limb-a (->BodyPois limb-a thigh-pois)
+             :limb-b (->BodyPois limb-a thigh-pois)
+             :limb-aa (->BodyPois limb-aa calf-pois)
+             :limb-ab (->BodyPois limb-ab calf-pois)
+             :limb-ba (->BodyPois limb-ba calf-pois)
+             :limb-aaa (->BodyPois limb-aaa toe-pois)
+             :limb-aab (->BodyPois limb-aab toe-pois)
+             :limb-aba (->BodyPois limb-aba toe-pois)
+             :limb-abb (->BodyPois limb-abb toe-pois)
+             :limb-baa (->BodyPois limb-baa toe-pois)}
+     :joints {:limb-a-rj rj-a
+              :limb-b-rj rj-a
+              :limb-aa-rj rj-aa
+              :limb-ab-rj rj-ab
+              :limb-ba-rj rj-ba
+              :limb-aaa-rj rj-aaa
+              :limb-aab-rj rj-aab
+              :limb-aba-rj rj-aba
+              :limb-abb-rj rj-abb
+              :limb-baa-rj rj-baa}}))
