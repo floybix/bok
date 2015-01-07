@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.tests.first
+(ns org.nfrac.hatto.tests.legge
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.players :as players]
             [org.nfrac.hatto.arena-simple :as arenas]
@@ -8,27 +8,29 @@
             [quil.middleware]
             [clojure.pprint]))
 
-(defn step-a
+(defn a-action
   [info]
-  (clojure.pprint/pprint info)
-  {:limb-a-rj -5
-   :limb-b-rj 0})
+  ;(clojure.pprint/pprint info)
+  {:limb-a1-rj 0
+   :limb-b1-rj 0
+   :limb-a2-rj -5
+   :limb-b2-rj 0})
 
-(defn step-b
+(defn b-action
   [info]
-  {:limb-a-rj 5
-   :limb-b-rj nil})
+  {:limb-a1-rj 5
+   :limb-b1-rj 0})
 
 (defn setup []
   (quil/frame-rate 30)
   (let [world (new-world)
         arena (arenas/build! world)
         player-a (->
-                  (players/nin world [-10 10] -1)
-                  (assoc :action-fn step-a))
+                  (players/legge world [-10 10] -1)
+                  (assoc :action-fn a-action))
         player-b (->
-                  (players/nin world [10 10] -2)
-                  (assoc :action-fn step-b))]
+                  (players/legge world [10 10] -2)
+                  (assoc :action-fn b-action))]
     (assoc bed/initial-state
       :world world
       :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
