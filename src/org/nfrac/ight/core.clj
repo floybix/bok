@@ -9,9 +9,9 @@
 
 (defn step-a
   [info]
-  (clojure.pprint/pprint info)
-  {:limb-a-rj 5
-   :limb-b-rj 1})
+  ;(clojure.pprint/pprint info)
+  {:limb-a-rj -5
+   :limb-b-rj 4})
 
 (defn act!
   [entity actions]
@@ -24,16 +24,14 @@
 (defrecord BodyPois [body pois])
 
 (defrecord PoiState
-    [body-id
-     poi
+    [poi
      position
      velocity
      angular-velocity])
 
 (defn poi-state
-  [body-id body poi]
-  (PoiState. body-id
-             poi
+  [body poi]
+  (PoiState. poi
              (position body poi)
              (linear-velocity body poi)
              (angular-velocity body)))
@@ -42,17 +40,17 @@
   [entity]
   (reduce-kv (fn [m k {:keys [body pois]}]
                (assoc m k (for [poi pois]
-                            (poi-state k body poi))))
+                            (poi-state body poi))))
              {}
              (:limbs entity)))
 
 (defn infer-derived-measures
-  [poi-state eye eye-vel]
-  (let [pos (:position poi-state)
-        vel (:velocity poi-state)
+  [^PoiState info eye eye-vel]
+  (let [pos (:position info)
+        vel (:velocity info)
         rel-pos (v-sub pos eye)
         rel-vel (v-sub vel eye-vel)]
-    (assoc poi-state
+    (assoc info
       :relative-position rel-pos
       :angle-from-me (v-angle rel-pos)
       :distance (v-dist pos eye)
