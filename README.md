@@ -1,4 +1,4 @@
-# Hatto
+# Hatto ハット"
 
 A programming game. Program behaviour for a creature in a 2D world to
 wrestle its opponent off the stage.
