@@ -1,5 +1,5 @@
 (ns org.nfrac.hatto.creatures
-  (:require [org.nfrac.hatto.core :refer [->BodyPois map->Entity]]
+  (:require [org.nfrac.hatto.data :refer [->BodyPois map->Entity]]
             [cljbox2d.core :refer :all]
             [cljbox2d.joints :refer :all]
             [cljbox2d.vec2d :refer [v-add]]))

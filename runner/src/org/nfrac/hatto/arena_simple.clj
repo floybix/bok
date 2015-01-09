@@ -1,5 +1,5 @@
 (ns org.nfrac.hatto.arena-simple
-  (:require [org.nfrac.hatto.core :refer [->BodyPois map->Entity]]
+  (:require [org.nfrac.hatto.data :refer [->BodyPois map->Entity]]
             [cljbox2d.core :refer :all]))
 
 (defn build!

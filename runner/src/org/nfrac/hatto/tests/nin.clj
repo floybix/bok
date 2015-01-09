@@ -1,9 +1,7 @@
 (ns org.nfrac.hatto.tests.nin
   (:require [org.nfrac.hatto.core :as core]
-            [org.nfrac.hatto.creatures :as creatures]
-            [org.nfrac.hatto.arena-simple :as arenas]
             [org.nfrac.cljbox2d.testbed :as bed]
-            [cljbox2d.core :refer [new-world step!]]
+            [cljbox2d.core :refer [step!]]
             [quil.core :as quil]
             [quil.middleware]
             [clojure.pprint]))
@@ -19,35 +17,25 @@
   {:limb-a-rj 5
    :limb-b-rj nil})
 
-(defn setup []
-  (quil/frame-rate 30)
-  (let [world (new-world)
-        arena (arenas/build! world)
-        player-a (->
-                  (creatures/build :nin world [-10 10] -1)
-                  (assoc :action-fn a-action))
-        player-b (->
-                  (creatures/build :nin world [10 10] -2)
-                  (assoc :action-fn b-action))]
-    (assoc bed/initial-state
-      :world world
-      :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
-      :game {:arena arena
-             :player-a player-a
-             :player-b player-b})))
-
 (defn step
   [state]
   (if (:paused? state)
     state
-    (-> (update-in state [:world] step! (:dt-secs state))
-        (core/post-step))))
+    (-> state
+        (update-in [:world] step! (:dt-secs state))
+        (update-in [:time] + (:dt-secs state))
+        (core/take-actions a-action b-action))))
+
+(defn setup []
+  (quil/frame-rate 30)
+  (merge bed/initial-state
+         (core/setup-game :nin :nin)))
 
 (defn -main
   "Run the test sketch."
   [& args]
   (quil/defsketch test-sketch
-    :title "Hatto"
+    :title "Hatto nin demo"
     :setup setup
     :update step
     :draw bed/draw

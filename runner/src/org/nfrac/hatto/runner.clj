@@ -1,9 +1,8 @@
 (ns org.nfrac.hatto.runner
   (:require [org.nfrac.hatto.core :as core]
-            [org.nfrac.hatto.creatures :as creatures]
             [org.nfrac.hatto.arena-simple :as arenas]
             [org.nfrac.cljbox2d.testbed :as bed]
-            [cljbox2d.core :refer [new-world step!]]
+            [cljbox2d.core :refer [step!]]
             [quil.core :as quil]
             [quil.middleware]
             [zeromq.zmq :as zmq]
@@ -31,28 +30,9 @@
   [socket msg]
   (zmq/send socket (to-transit msg)))
 
-(defn setup-game
-  [ident-a ident-b]
-  (let [world (new-world)
-        arena (arenas/build! world)
-        creature-a (creatures/build (:creature-type ident-a) world [-10 10] -1)
-        creature-b (creatures/build (:creature-type ident-b) world [10 10] -2)]
-    {:world world
-     :time 0.0
-     :dt-secs (/ 1 30.0)
-     :dt-act-secs (/ 1 5.0)
-     :last-act-time 0.0
-     :entities {:arena arena
-                :creature-a creature-a
-                :creature-b creature-b}}))
-
-(defn act-now?
-  [{:keys [time dt-act-secs last-act-time]}]
-  (>= time (+ dt-act-secs last-act-time)))
-
 (defn take-actions
   [state]
-  (if (act-now? state)
+  (if (core/act-now? state)
     (let [{:keys [sock-a sock-b]} state
           obs-a (core/perceive state :creature-a)
           obs-b (core/perceive state :creature-b)]
@@ -104,7 +84,8 @@
           ident-b (recv-msg sock-b)]
       (println ident-a)
       (println ident-b)
-      (let [game (-> (setup-game ident-a ident-b)
+      (let [game (-> (core/setup-game (:creature-type ident-a)
+                                      (:creature-type ident-b))
                      (assoc :sock-a sock-a
                             :sock-b sock-b))]
         (run-with-display game)
