@@ -1,6 +1,6 @@
 (ns org.nfrac.hatto.tests.legge
   (:require [org.nfrac.hatto.core :as core]
-            [org.nfrac.hatto.players :as players]
+            [org.nfrac.hatto.creatures :as creatures]
             [org.nfrac.hatto.arena-simple :as arenas]
             [org.nfrac.cljbox2d.testbed :as bed]
             [cljbox2d.core :refer [new-world step!]]
@@ -26,10 +26,10 @@
   (let [world (new-world)
         arena (arenas/build! world)
         player-a (->
-                  (players/legge world [-10 10] -1)
+                  (creatures/build :legge world [-10 10] -1)
                   (assoc :action-fn a-action))
         player-b (->
-                  (players/legge world [10 10] -2)
+                  (creatures/build :legge world [10 10] -2)
                   (assoc :action-fn b-action))]
     (assoc bed/initial-state
       :world world

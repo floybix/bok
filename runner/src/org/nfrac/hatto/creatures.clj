@@ -1,8 +1,12 @@
-(ns org.nfrac.hatto.players
-  (:require [org.nfrac.hatto.core :refer [->BodyPois]]
+(ns org.nfrac.hatto.creatures
+  (:require [org.nfrac.hatto.core :refer [->BodyPois map->Entity]]
             [cljbox2d.core :refer :all]
             [cljbox2d.joints :refer :all]
             [cljbox2d.vec2d :refer [v-add]]))
+
+(defmulti build
+  (fn [type world _ _]
+    type))
 
 (defn revo-joint!
   [body-a body-b world-anchor]
@@ -12,8 +16,8 @@
            :world-anchor world-anchor
            :max-motor-torque 1000}))
 
-(defn nin
-  [world position group-index]
+(defmethod build :nin
+  [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.5)
                      :density 10
@@ -30,15 +34,17 @@
         limb-b (body! world {:position position} tri-fx)
         rj-a (revo-joint! limb-a head position)
         rj-b (revo-joint! limb-b head position)]
-    {:entity-type :nin
-     :limbs {:head (->BodyPois head [[0 0]])
-             :limb-a (->BodyPois limb-a tri-pois)
-             :limb-b (->BodyPois limb-b tri-pois)}
-     :joints {:limb-a-rj rj-a
-              :limb-b-rj rj-b}}))
+    (map->Entity
+     {:entity-type :creature
+      :creature-type type
+      :objects {:head (->BodyPois head [[0 0]])
+                :limb-a (->BodyPois limb-a tri-pois)
+                :limb-b (->BodyPois limb-b tri-pois)}
+      :joints {:limb-a-rj rj-a
+               :limb-b-rj rj-b}})))
 
-(defn legge
-  [world position group-index]
+(defmethod build :legge
+  [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.5)
                      :density 10
@@ -59,19 +65,21 @@
         limb-b2 (body! world {:position calf-pos} calf-fx)
         rj-a2 (revo-joint! limb-a1 limb-a2 calf-pos)
         rj-b2 (revo-joint! limb-b1 limb-b2 calf-pos)]
-    {:entity-type :legge
-     :limbs {:head (->BodyPois head [[0 0]])
-             :limb-a1 (->BodyPois limb-a1 limb-pois)
-             :limb-b1 (->BodyPois limb-b1 limb-pois)
-             :limb-a2 (->BodyPois limb-a2 limb-pois)
-             :limb-b2 (->BodyPois limb-b2 limb-pois)}
-     :joints {:limb-a1-rj rj-a1
-              :limb-b1-rj rj-b1
-              :limb-a2-rj rj-a2
-              :limb-b2-rj rj-b2}}))
+    (map->Entity
+     {:entity-type :creature
+      :creature-type type
+      :objects {:head (->BodyPois head [[0 0]])
+                :limb-a1 (->BodyPois limb-a1 limb-pois)
+                :limb-b1 (->BodyPois limb-b1 limb-pois)
+                :limb-a2 (->BodyPois limb-a2 limb-pois)
+                :limb-b2 (->BodyPois limb-b2 limb-pois)}
+      :joints {:limb-a1-rj rj-a1
+               :limb-b1-rj rj-b1
+               :limb-a2-rj rj-a2
+               :limb-b2-rj rj-b2}})))
 
-(defn hatto
-  [world position group-index]
+(defmethod build :hatto
+  [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.5)
                      :density 10
@@ -112,25 +120,28 @@
         rj-aba (revo-joint! limb-aba limb-ab toe-pos)
         rj-abb (revo-joint! limb-abb limb-ab toe-pos)
         rj-baa (revo-joint! limb-baa limb-ba toe-pos)]
-    {:entity-type :hatto
-     :limbs {:head (->BodyPois head [[0 0]])
-             :limb-a (->BodyPois limb-a thigh-pois)
-             :limb-b (->BodyPois limb-a thigh-pois)
-             :limb-aa (->BodyPois limb-aa calf-pois)
-             :limb-ab (->BodyPois limb-ab calf-pois)
-             :limb-ba (->BodyPois limb-ba calf-pois)
-             :limb-aaa (->BodyPois limb-aaa toe-pois)
-             :limb-aab (->BodyPois limb-aab toe-pois)
-             :limb-aba (->BodyPois limb-aba toe-pois)
-             :limb-abb (->BodyPois limb-abb toe-pois)
-             :limb-baa (->BodyPois limb-baa toe-pois)}
-     :joints {:limb-a-rj rj-a
-              :limb-b-rj rj-a
-              :limb-aa-rj rj-aa
-              :limb-ab-rj rj-ab
-              :limb-ba-rj rj-ba
-              :limb-aaa-rj rj-aaa
-              :limb-aab-rj rj-aab
-              :limb-aba-rj rj-aba
-              :limb-abb-rj rj-abb
-              :limb-baa-rj rj-baa}}))
+    (map->Entity
+     {:entity-type :creature
+      :creature-type type
+      :objects {:head (->BodyPois head [[0 0]])
+                :limb-a (->BodyPois limb-a thigh-pois)
+                :limb-b (->BodyPois limb-a thigh-pois)
+                :limb-aa (->BodyPois limb-aa calf-pois)
+                :limb-ab (->BodyPois limb-ab calf-pois)
+                :limb-ba (->BodyPois limb-ba calf-pois)
+                :limb-aaa (->BodyPois limb-aaa toe-pois)
+                :limb-aab (->BodyPois limb-aab toe-pois)
+                :limb-aba (->BodyPois limb-aba toe-pois)
+                :limb-abb (->BodyPois limb-abb toe-pois)
+                :limb-baa (->BodyPois limb-baa toe-pois)}
+      :joints {:limb-a-rj rj-a
+               :limb-b-rj rj-a
+               :limb-aa-rj rj-aa
+               :limb-ab-rj rj-ab
+               :limb-ba-rj rj-ba
+               :limb-aaa-rj rj-aaa
+               :limb-aab-rj rj-aab
+               :limb-aba-rj rj-aba
+               :limb-abb-rj rj-abb
+               :limb-baa-rj rj-baa}})))
+

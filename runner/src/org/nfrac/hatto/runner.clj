@@ -1,5 +1,12 @@
 (ns org.nfrac.hatto.runner
-  (:require [zeromq.zmq :as zmq]
+  (:require [org.nfrac.hatto.core :as core]
+            [org.nfrac.hatto.creatures :as creatures]
+            [org.nfrac.hatto.arena-simple :as arenas]
+            [org.nfrac.cljbox2d.testbed :as bed]
+            [cljbox2d.core :refer [new-world step!]]
+            [quil.core :as quil]
+            [quil.middleware]
+            [zeromq.zmq :as zmq]
             [cognitect.transit :as transit])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
@@ -24,29 +31,94 @@
   [socket msg]
   (zmq/send socket (to-transit msg)))
 
+(defn setup-game
+  [ident-a ident-b]
+  (let [world (new-world)
+        arena (arenas/build! world)
+        creature-a (creatures/build (:creature-type ident-a) world [-10 10] -1)
+        creature-b (creatures/build (:creature-type ident-b) world [10 10] -2)]
+    {:world world
+     :time 0.0
+     :dt-secs (/ 1 30.0)
+     :dt-act-secs (/ 1 5.0)
+     :last-act-time 0.0
+     :entities {:arena arena
+                :creature-a creature-a
+                :creature-b creature-b}}))
+
+(defn act-now?
+  [{:keys [time dt-act-secs last-act-time]}]
+  (>= time (+ dt-act-secs last-act-time)))
+
+(defn take-actions
+  [state]
+  (if (act-now? state)
+    (let [{:keys [sock-a sock-b]} state
+          obs-a (core/perceive state :creature-a)
+          obs-b (core/perceive state :creature-b)]
+      (send-msg sock-a {:type :react :data obs-a})
+      (send-msg sock-b {:type :react :data obs-b})
+      (let [act-a (:data (recv-msg sock-a))
+            act-b (:data (recv-msg sock-b))]
+        (core/act! (:creature-a (:entities state)) act-a)
+        (core/act! (:creature-b (:entities state)) act-b)
+        (assoc state :last-act-time (:time state))))
+    state))
+
+(defn step
+  [state]
+  (if (:paused? state)
+    state
+    (-> state
+        (update-in [:world] step! (:dt-secs state))
+        (update-in [:time] + (:dt-secs state))
+        (take-actions))))
+
+(defn run-with-display
+  [game]
+  (quil/defsketch bout-sketch
+    :title "Hatto"
+    :setup (fn [] (merge bed/initial-state game))
+    :update step
+    :draw bed/draw
+    :key-typed bed/key-press
+    :mouse-pressed bed/mouse-pressed
+    :mouse-released bed/mouse-released
+    :mouse-dragged bed/mouse-dragged
+    :size [1200 600]
+    :middleware [quil.middleware/fun-mode])
+  )
+
+(defn run-bout
+  [sock-a sock-b & {:keys [display?]}]
+  (let [bout-id (str (java.util.UUID/randomUUID))]
+    (println "inviting to bout" bout-id)
+    (send-msg sock-a {:type :invite, :bout-id bout-id})
+    (send-msg sock-b {:type :invite, :bout-id bout-id})
+    (assert (= :join (:type (recv-msg sock-a))))
+    (assert (= :join (:type (recv-msg sock-b))))
+    (println "identifying players.")
+    (send-msg sock-a {:type :identify})
+    (send-msg sock-b {:type :identify})
+    (let [ident-a (recv-msg sock-a)
+          ident-b (recv-msg sock-b)]
+      (println ident-a)
+      (println ident-b)
+      (let [game (-> (setup-game ident-a ident-b)
+                     (assoc :sock-a sock-a
+                            :sock-b sock-b))]
+        (run-with-display game)
+        ))))
+
 (defn -main
   [addr-a addr-b & more-args]
-  (let [ctx (zmq/context 1)
-        bout-id (str (java.util.UUID/randomUUID))]
+  (let [ctx (zmq/context 1)]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
-    (with-open [sock-a (doto (zmq/socket ctx :req)
-                         (zmq/connect addr-a))
-                sock-b (doto (zmq/socket ctx :req)
-                         (zmq/connect addr-b))]
+    (let ;with-open
+        [sock-a (doto (zmq/socket ctx :req)
+                  (zmq/connect addr-a))
+         sock-b (doto (zmq/socket ctx :req)
+                  (zmq/connect addr-b))]
       (println "connected.")
-      (println "inviting to bout" bout-id)
-      (send-msg sock-a {:type :invite, :bout-id bout-id})
-      (send-msg sock-b {:type :invite, :bout-id bout-id})
-      (assert (= :join (:type (recv-msg sock-a))))
-      (assert (= :join (:type (recv-msg sock-b))))
-      (println "identifying players.")
-      (send-msg sock-a {:type :identify})
-      (send-msg sock-b {:type :identify})
-      (let [ident-a (recv-msg sock-a)
-            ident-b (recv-msg sock-b)]
-        (println ident-a)
-        (println ident-b)
-        ;; TODO create world
-        (let []
-          )))))
+      (run-bout sock-a sock-b))))

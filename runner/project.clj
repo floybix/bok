@@ -8,4 +8,6 @@
                  [org.zeromq/jeromq "0.3.4"]
                  [org.zeromq/cljzmq "0.1.4" :exclusions [org.zeromq/jzmq]]
                  [com.cognitect/transit-clj "0.8.259"]
-                 [org.clojure/clojure "1.6.0"]])
+                 [org.clojure/clojure "1.6.0"]]
+  ;:jvm-opts ^:replace ["-server" "-XX:+UseConcMarkSweepGC"]
+  )
