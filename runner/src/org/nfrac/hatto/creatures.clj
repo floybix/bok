@@ -25,11 +25,11 @@
         tri-pts [[0.0 0.3]
                  [0.9 -0.4]
                  [-0.7 -0.4]]
+        ;; first vertex internal so not a Point Of Interest
+        tri-pois (drop 1 tri-pts)
         tri-fx {:shape (polygon tri-pts)
                 :density 10
                 :group-index group-index}
-        ;; first vertex internal so not a Point Of Interest
-        tri-pois (drop 1 tri-pts)
         limb-a (body! world {:position position} tri-fx)
         limb-b (body! world {:position position} tri-fx)
         rj-a (revo-joint! limb-a head position)
@@ -50,8 +50,7 @@
                      :density 10
                      :group-index group-index})
         len 1.0
-        limb-pois [[0.0 0.0]
-                   [0.0 len]]
+        limb-pois [[0.0 len]]
         thigh-fx {:shape (rod [0 0] 0 len 0.1)
                   :density 10
                   :group-index group-index}
@@ -85,8 +84,7 @@
                      :density 10
                      :group-index group-index})
         thigh-len 1.0
-        thigh-pois [[0.0 0.0]
-                    [0.0 thigh-len]]
+        thigh-pois [[0.0 thigh-len]]
         thigh-fx {:shape (rod [0 0] 0 thigh-len 0.1)
                   :density 10
                   :group-index group-index}
@@ -96,8 +94,7 @@
         rj-b (revo-joint! limb-b head position)
         calf-pos (v-add position [thigh-len 0.0])
         calf-len (* thigh-len 0.67)
-        calf-pois [[0.0 0.0]
-                   [0.0 calf-len]]
+        calf-pois [[0.0 calf-len]]
         calf-fx (assoc thigh-fx :shape (rod [0 0] 0 calf-len 0.1))
         limb-aa (body! world {:position calf-pos} calf-fx)
         limb-ab (body! world {:position calf-pos} calf-fx)
@@ -107,8 +104,7 @@
         rj-ba (revo-joint! limb-ba limb-b calf-pos)
         toe-pos (v-add calf-pos [calf-len 0.0])
         toe-len (* calf-len 0.67)
-        toe-pois [[0.0 0.0]
-                  [0.0 toe-len]]
+        toe-pois [[0.0 toe-len]]
         toe-fx (assoc calf-fx :shape (rod [0 0] 0 toe-len 0.1))
         limb-aaa (body! world {:position toe-pos} toe-fx)
         limb-aab (body! world {:position toe-pos} toe-fx)
