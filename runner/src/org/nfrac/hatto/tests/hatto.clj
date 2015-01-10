@@ -1,7 +1,7 @@
 (ns org.nfrac.hatto.tests.hatto
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.cljbox2d.testbed :as bed]
-            [cljbox2d.core :refer [step!]]
+            [cljbox2d.core :refer [step! mass]]
             [quil.core :as quil]
             [quil.middleware]
             [clojure.pprint]))
@@ -39,8 +39,10 @@
 
 (defn setup []
   (quil/frame-rate 30)
-  (merge bed/initial-state
-         (core/setup-game :hatto :hatto)))
+  (let [game (core/setup-game :hatto :hatto)]
+    (println "hatto mass:"
+             (-> game :entities :creature-a core/entity-mass))
+    (merge bed/initial-state game)))
 
 (defn -main
   "Run the test sketch."

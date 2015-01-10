@@ -5,50 +5,70 @@
             [org.nfrac.hatto.arena-simple :as arenas]
             [org.nfrac.hatto.data :refer [->PointState]]))
 
+(defn entity-mass
+  [entity]
+  (->> entity
+       :components
+       vals
+       (map (comp mass :body))
+       (reduce +)))
+
+(defn entity-angular-velocity
+  [entity]
+  (let [total-mass (entity-mass entity)]
+    (if (zero? total-mass)
+      0.0
+      (->> entity
+           :components
+           vals
+           (map :body)
+           (reduce (fn [av body]
+                     (+ av (* (angular-velocity body)
+                              (/ (mass body) total-mass))))
+                   0)))))
+
 (defn point-state
   [body poi]
   (->PointState poi
                 (position body poi)
-                (linear-velocity body poi)
-                (angular-velocity body)))
+                (linear-velocity body poi)))
 
-(defn observe-entity
+(defn observe-components
   [entity]
   (reduce-kv (fn [m k {:keys [body pois]}]
                (assoc m k (for [poi pois]
                             (point-state body poi))))
              {}
-             (:objects entity)))
+             (:components entity)))
 
 (defn sense-joints
   [entity inv-dt]
   (reduce-kv (fn [m k jt]
                (assoc m k
-                      {:joint-speed (joint-speed jt)
-                       :motor-on? (motor-enabled? jt)
+                      {:joint-angle (joint-angle jt)
+                       :joint-speed (joint-speed jt)
                        :motor-speed (motor-speed jt)
                        :motor-torque (motor-torque jt inv-dt)}))
              {}
              (:joints entity)))
 
+(defn perceive-entity
+  [entity inv-dt]
+  {:components (observe-components entity)
+   :joints (sense-joints entity inv-dt)
+   :angular-velocity (entity-angular-velocity entity)})
+
 (defn perceive
   [state player-key]
   (let [inv-dt (/ 1 (:dt-secs state))
         me (get-in state [:entities player-key])
-        my-head (:body (:head (:objects me)))
-        eye (position my-head)
-        eye-vel (linear-velocity my-head)
         obs (reduce-kv (fn [m k entity]
-                         (assoc m k (observe-entity entity)))
+                         (assoc m k (perceive-entity entity inv-dt)))
                        {}
                        (:entities state))]
-    (-> obs
-        (assoc :myself {:limbs (obs player-key)
-                        :joints (sense-joints me inv-dt)
-                        :eye-position eye
-                        :eye-velocity eye-vel}
-               :time (:time state))
-        (dissoc player-key))))
+    {:time (:time state)
+     :my-key player-key
+     :entities obs}))
 
 (defn act!
   [entity actions]
@@ -86,6 +106,7 @@
      :dt-act-secs (/ 1 5.0)
      :last-act-time 0.0
      :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
+     :player-keys #{:creature-a :creature-b}
      :entities {:arena arena
                 :creature-a creature-a
                 :creature-b creature-b}}))

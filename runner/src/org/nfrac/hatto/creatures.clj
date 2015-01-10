@@ -20,7 +20,8 @@
   [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.5)
-                     :density 10
+                     :density 5
+                     :friction 0.5
                      :group-index group-index})
         tri-pts [[0.0 0.3]
                  [0.9 -0.4]
@@ -28,7 +29,8 @@
         ;; first vertex internal so not a Point Of Interest
         tri-pois (drop 1 tri-pts)
         tri-fx {:shape (polygon tri-pts)
-                :density 10
+                :density 5
+                :friction 0.5
                 :group-index group-index}
         limb-a (body! world {:position position} tri-fx)
         limb-b (body! world {:position position} tri-fx)
@@ -37,9 +39,9 @@
     (map->Entity
      {:entity-type :creature
       :creature-type type
-      :objects {:head (->BodyPois head [[0 0]])
-                :limb-a (->BodyPois limb-a tri-pois)
-                :limb-b (->BodyPois limb-b tri-pois)}
+      :components {:head (->BodyPois head [[0 0]])
+                   :limb-a (->BodyPois limb-a tri-pois)
+                   :limb-b (->BodyPois limb-b tri-pois)}
       :joints {:limb-a-rj rj-a
                :limb-b-rj rj-b}})))
 
@@ -47,12 +49,14 @@
   [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.5)
-                     :density 10
+                     :density 5
+                     :friction 0.5
                      :group-index group-index})
         len 1.0
         limb-pois [[0.0 len]]
         thigh-fx {:shape (rod [0 0] 0 len 0.1)
                   :density 10
+                  :friction 0.5
                   :group-index group-index}
         limb-a1 (body! world {:position position} thigh-fx)
         limb-b1 (body! world {:position position} thigh-fx)
@@ -67,11 +71,11 @@
     (map->Entity
      {:entity-type :creature
       :creature-type type
-      :objects {:head (->BodyPois head [[0 0]])
-                :limb-a1 (->BodyPois limb-a1 limb-pois)
-                :limb-b1 (->BodyPois limb-b1 limb-pois)
-                :limb-a2 (->BodyPois limb-a2 limb-pois)
-                :limb-b2 (->BodyPois limb-b2 limb-pois)}
+      :components {:head (->BodyPois head [[0 0]])
+                   :limb-a1 (->BodyPois limb-a1 limb-pois)
+                   :limb-b1 (->BodyPois limb-b1 limb-pois)
+                   :limb-a2 (->BodyPois limb-a2 limb-pois)
+                   :limb-b2 (->BodyPois limb-b2 limb-pois)}
       :joints {:limb-a1-rj rj-a1
                :limb-b1-rj rj-b1
                :limb-a2-rj rj-a2
@@ -81,12 +85,14 @@
   [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.5)
-                     :density 10
+                     :density 5
+                     :friction 0.5
                      :group-index group-index})
         thigh-len 1.0
         thigh-pois [[0.0 thigh-len]]
         thigh-fx {:shape (rod [0 0] 0 thigh-len 0.1)
                   :density 10
+                  :friction 0.5
                   :group-index group-index}
         limb-a (body! world {:position position} thigh-fx)
         limb-b (body! world {:position position} thigh-fx)
@@ -119,17 +125,17 @@
     (map->Entity
      {:entity-type :creature
       :creature-type type
-      :objects {:head (->BodyPois head [[0 0]])
-                :limb-a (->BodyPois limb-a thigh-pois)
-                :limb-b (->BodyPois limb-a thigh-pois)
-                :limb-aa (->BodyPois limb-aa calf-pois)
-                :limb-ab (->BodyPois limb-ab calf-pois)
-                :limb-ba (->BodyPois limb-ba calf-pois)
-                :limb-aaa (->BodyPois limb-aaa toe-pois)
-                :limb-aab (->BodyPois limb-aab toe-pois)
-                :limb-aba (->BodyPois limb-aba toe-pois)
-                :limb-abb (->BodyPois limb-abb toe-pois)
-                :limb-baa (->BodyPois limb-baa toe-pois)}
+      :components {:head (->BodyPois head [[0 0]])
+                   :limb-a (->BodyPois limb-a thigh-pois)
+                   :limb-b (->BodyPois limb-a thigh-pois)
+                   :limb-aa (->BodyPois limb-aa calf-pois)
+                   :limb-ab (->BodyPois limb-ab calf-pois)
+                   :limb-ba (->BodyPois limb-ba calf-pois)
+                   :limb-aaa (->BodyPois limb-aaa toe-pois)
+                   :limb-aab (->BodyPois limb-aab toe-pois)
+                   :limb-aba (->BodyPois limb-aba toe-pois)
+                   :limb-abb (->BodyPois limb-abb toe-pois)
+                   :limb-baa (->BodyPois limb-baa toe-pois)}
       :joints {:limb-a-rj rj-a
                :limb-b-rj rj-a
                :limb-aa-rj rj-aa

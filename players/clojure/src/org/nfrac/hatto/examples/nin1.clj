@@ -10,9 +10,15 @@
 
 (defn my-action-fn
   [{:keys [current] :as state}]
-  (assoc state
-    :actions {:limb-a-rj -5
-              :limb-b-rj 0}))
+  (let [{:keys [my-key entities]} current
+        me (get entities my-key)
+        other-keys (keys (dissoc entities my-key :arena))
+        my-head (:head (:components me))
+        eye (:position my-head)
+        eye-vel (:velocity my-head)]
+   (assoc state
+     :actions {:limb-a-rj -5
+               :limb-b-rj 0})))
 
 (defn -main
   [& [port more-args]]

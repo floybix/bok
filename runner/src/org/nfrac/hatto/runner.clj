@@ -30,7 +30,7 @@
   [socket msg]
   (zmq/send socket (to-transit msg)))
 
-(defn take-actions
+(defn take-remote-actions
   [state]
   (if (core/act-now? state)
     (let [{:keys [sock-a sock-b]} state
@@ -52,7 +52,7 @@
     (-> state
         (update-in [:world] step! (:dt-secs state))
         (update-in [:time] + (:dt-secs state))
-        (take-actions))))
+        (take-remote-actions))))
 
 (defn run-with-display
   [game]

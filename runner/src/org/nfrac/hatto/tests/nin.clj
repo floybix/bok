@@ -1,14 +1,14 @@
 (ns org.nfrac.hatto.tests.nin
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.cljbox2d.testbed :as bed]
-            [cljbox2d.core :refer [step!]]
+            [cljbox2d.core :refer [step! mass]]
             [quil.core :as quil]
             [quil.middleware]
             [clojure.pprint]))
 
 (defn a-action
   [info]
-  ;(clojure.pprint/pprint info)
+  (clojure.pprint/pprint info)
   {:limb-a-rj -5
    :limb-b-rj 0})
 
@@ -28,8 +28,10 @@
 
 (defn setup []
   (quil/frame-rate 30)
-  (merge bed/initial-state
-         (core/setup-game :nin :nin)))
+  (let [game (core/setup-game :nin :nin)]
+    (println "nin mass:"
+             (-> game :entities :creature-a core/entity-mass))
+    (merge bed/initial-state game)))
 
 (defn -main
   "Run the test sketch."
