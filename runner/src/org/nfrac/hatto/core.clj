@@ -36,8 +36,10 @@
 (defn observe-components
   [entity]
   (reduce-kv (fn [m k {:keys [body pois]}]
-               (assoc m k (for [poi pois]
-                            (point-state body poi))))
+               (assoc m k
+                      {:angle (angle body)
+                       :points (for [poi pois]
+                                 (point-state body poi))}))
              {}
              (:components entity)))
 
