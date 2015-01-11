@@ -1,10 +1,7 @@
 (ns org.nfrac.hatto.runner
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.arena-simple :as arenas]
-            [org.nfrac.cljbox2d.testbed :as bed]
             [cljbox2d.core :refer [step!]]
-            [quil.core :as quil]
-            [quil.middleware]
             [zeromq.zmq :as zmq]
             [cognitect.transit :as transit])
   (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
@@ -33,11 +30,11 @@
 (defn take-remote-actions
   [state]
   (if (core/act-now? state)
-    (let [{:keys [sock-a sock-b]} state
+    (let [{:keys [bout-id sock-a sock-b]} state
           obs-a (core/perceive state :creature-a)
           obs-b (core/perceive state :creature-b)]
-      (send-msg sock-a {:type :react :data obs-a})
-      (send-msg sock-b {:type :react :data obs-b})
+      (send-msg sock-a {:type :react, :bout-id bout-id, :data obs-a})
+      (send-msg sock-b {:type :react, :bout-id bout-id, :data obs-b})
       (let [act-a (:data (recv-msg sock-a))
             act-b (:data (recv-msg sock-b))]
         (core/act! (:creature-a (:entities state)) act-a)
@@ -54,23 +51,24 @@
         (update-in [:time] + (:dt-secs state))
         (take-remote-actions))))
 
-(defn run-with-display
-  [game]
-  (quil/defsketch bout-sketch
-    :title "Hatto"
-    :setup (fn [] (merge bed/initial-state game))
-    :update step
-    :draw bed/draw
-    :key-typed bed/key-press
-    :mouse-pressed bed/mouse-pressed
-    :mouse-released bed/mouse-released
-    :mouse-dragged bed/mouse-dragged
-    :size [1200 600]
-    :middleware [quil.middleware/fun-mode])
-  )
-
 (defn run-bout
-  [sock-a sock-b & {:keys [display?]}]
+  [game]
+  (loop [game game]
+    (if (:finished? game)
+      game
+      (recur (step game)))))
+
+(defn end-bout
+  [game]
+  (let [{:keys [bout-id sock-a sock-b]} state]
+    (send-msg sock-a {:type :finished, :bout-id bout-id})
+    (send-msg sock-b {:type :finished, :bout-id bout-id})
+    (assert (= :bye (:type (recv-msg sock-a))))
+    (assert (= :bye (:type (recv-msg sock-b))))
+    game))
+
+(defn start-bout
+  [sock-a sock-b]
   (let [bout-id (str (java.util.UUID/randomUUID))]
     (println "inviting to bout" bout-id)
     (send-msg sock-a {:type :invite, :bout-id bout-id})
@@ -84,12 +82,13 @@
           ident-b (recv-msg sock-b)]
       (println ident-a)
       (println ident-b)
-      (let [game (-> (core/setup-game (:creature-type ident-a)
-                                      (:creature-type ident-b))
-                     (assoc :sock-a sock-a
-                            :sock-b sock-b))]
-        (run-with-display game)
-        ))))
+      (-> (core/setup-game (:creature-type ident-a)
+                           (:creature-type ident-b))
+          (assoc :bout-id bout-id
+                 :ident-a ident-a
+                 :ident-b ident-b
+                 :sock-a sock-a
+                 :sock-b sock-b)))))
 
 (defn -main
   [addr-a addr-b & more-args]
@@ -100,6 +99,10 @@
         [sock-a (doto (zmq/socket ctx :req)
                   (zmq/connect addr-a))
          sock-b (doto (zmq/socket ctx :req)
-                  (zmq/connect addr-b))]
+                  (zmq/connect addr-b))
+         ]
       (println "connected.")
-      (run-bout sock-a sock-b))))
+      (-> (start-bout sock-a sock-b)
+          (run-bout)
+          (end-bout)
+          (println)))))
