@@ -49,7 +49,7 @@
                (assoc m k
                       {:joint-angle (joint-angle jt)
                        :joint-speed (joint-speed jt)
-                       :motor-speed (motor-speed jt)
+                       :motor-speed (when (motor-enabled? jt) (motor-speed jt))
                        :motor-torque (motor-torque jt inv-dt)}))
              {}
              (:joints entity)))
@@ -75,10 +75,12 @@
 (defn act!
   [entity actions]
   (doseq [[k v] actions]
-    (let [jt (get-in entity [:joints k])]
-      (enable-motor! jt (boolean v))
-      (when v
-        (motor-speed! jt v)))))
+    (if-let [jt (get-in entity [:joints k])]
+      (do
+        (enable-motor! jt (boolean v))
+        (when v
+          (motor-speed! jt v)))
+      (println "Joint" k "does not exist."))))
 
 (defn act-now?
   [{:keys [time dt-act-secs last-act-time]}]
