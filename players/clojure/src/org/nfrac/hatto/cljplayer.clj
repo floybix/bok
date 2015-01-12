@@ -25,27 +25,40 @@
   (zmq/send socket (to-transit msg)))
 
 (defn run-server
-  [socket ident action-fn]
-  (loop [bouts {}]
-    (let [msg (recv-msg socket)]
-      (println msg)
-      (case (:type msg)
-        :identify (do
-                    (send-msg socket (assoc ident
+  "Receives messages on the socket in an infinite loop. The atom
+   `peek-ref` stores state for any active bouts, in a map keyed by
+   bout id."
+  [socket ident action-fn peek-ref]
+  (let [bouts peek-ref]
+    (while true
+      (let [msg (recv-msg socket)]
+        (println msg)
+        (case (:type msg)
+          :identify (send-msg socket (assoc ident
                                        :type :ident))
-                    (recur bouts))
-        :invite (let [bout-id (:bout-id msg)]
-                  (send-msg socket {:type :join
-                                    :bout-id bout-id})
-                  (recur (assoc bouts bout-id {})))
-        :react (let [bout-id (:bout-id msg)
-                     last-state (bouts bout-id)
-                     state (action-fn (assoc last-state
-                                        :current (:data msg)))]
-                 (send-msg socket {:type :actions
-                                   :data (:actions state)})
-                 (recur (assoc bouts bout-id state)))
-        :finished (let [bout-id (:bout-id msg)]
-                    (send-msg socket {:type :bye})
-                    (recur (dissoc bouts bout-id)))))))
+          :invite (let [bout-id (:bout-id msg)]
+                    (send-msg socket {:type :join
+                                      :bout-id bout-id})
+                    (swap! bouts assoc bout-id {}))
+          :react (let [bout-id (:bout-id msg)
+                       last-state (@bouts bout-id)
+                       state (action-fn (assoc last-state
+                                          :current (:data msg)))
+                       actions (:actions state)]
+                   (send-msg socket {:type :actions
+                                     :data actions})
+                   (swap! bouts assoc bout-id state))
+          :finished (let [bout-id (:bout-id msg)]
+                      (send-msg socket {:type :bye})
+                      (swap! bouts dissoc bout-id)))))))
 
+(defn start-server
+  [port ident action-fn peek-ref]
+  (let [ctx (zmq/context 1)
+        port (or port (zmq/first-free-port))
+        addr (str "tcp://*:" port)]
+    (println "starting server on TCP port " port)
+    (with-open [socket (doto (zmq/socket ctx :rep)
+                         (zmq/bind addr))]
+      (binding [*out* *err*]
+        (run-server socket ident action-fn peek-ref)))))

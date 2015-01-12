@@ -2,9 +2,9 @@
 
 Very early stage - experiments only.
 
-Hatto is a programming game. That means you don't play it directly.
-Instead you make a program to play it. Your program is the player, and
-you tell it how to play.
+Hatto is a programming game. That means you don't play the game
+directly. Instead you make a program to play it. Your program is the
+player, and you tell it how to play.
 
 The game takes place in a 2D world (with physics and gravity). The aim
 is to push your opponent off the arena, or at least avoid falling off
@@ -47,7 +47,7 @@ lein run -m org.nfrac.hatto.tests.legge
 lein run -m org.nfrac.hatto.tests.hatto
 ```
 
-And try running players over the wire:
+Or try running players over the wire:
 
 ```
 cd hatto/players/clojure
@@ -56,6 +56,8 @@ lein run -m org.nfrac.hatto.examples.nin1 5556 &
 cd hatto/runner
 lein run -m org.nfrac.hatto.visual-runner tcp://localhost:5555 tcp://localhost:5556
 ```
+
+Or use the REPL: see [REPL session](https://github.com/floybix/hatto/wiki/REPL-session)
 
 
 ## License
