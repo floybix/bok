@@ -2,7 +2,7 @@
   (:require [cljbox2d.core :refer :all]
             [cljbox2d.joints :refer :all]
             [org.nfrac.hatto.creatures :as creatures]
-            [org.nfrac.hatto.arena-simple :as arenas]
+            [org.nfrac.hatto.arenas :as arenas]
             [org.nfrac.hatto.data :refer [->PointState]]))
 
 (defn entity-mass
@@ -97,9 +97,9 @@
     state))
 
 (defn setup-game
-  [type-a type-b]
+  [arena-type type-a type-b]
   (let [world (new-world)
-        arena (arenas/build! world)
+        arena (arenas/build arena-type world)
         creature-a (creatures/build type-a world [-10 10] -1)
         creature-b (creatures/build type-b world [10 10] -2)]
     {:world world
