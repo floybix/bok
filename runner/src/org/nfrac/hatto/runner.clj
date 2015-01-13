@@ -85,7 +85,8 @@
       (-> (core/setup-game arena-type
                            (:creature-type ident-a)
                            (:creature-type ident-b))
-          (assoc :bout-id bout-id
+          (assoc :timeout-secs 60
+                 :bout-id bout-id
                  :ident-a ident-a
                  :ident-b ident-b
                  :sock-a sock-a
@@ -105,4 +106,5 @@
       (-> (start-bout arena-type sock-a sock-b)
           (run-bout)
           (end-bout)
+          :final-result
           (println)))))

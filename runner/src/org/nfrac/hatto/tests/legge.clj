@@ -38,4 +38,5 @@
              (-> game :entities :creature-a core/entity-mass))
     (-> game
         (visrun/run-with-display step-local)
+        :final-result
         pprint)))

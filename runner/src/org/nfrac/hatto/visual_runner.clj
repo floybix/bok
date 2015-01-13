@@ -42,9 +42,9 @@
               sock-b (doto (zmq/socket ctx :req)
                        (zmq/connect addr-b))]
     (-> (runner/start-bout arena-type sock-a sock-b)
+        (assoc :timeout-secs Double/POSITIVE_INFINITY)
         (run-with-display step-remote)
-        (runner/end-bout)
-        (println))))
+        (runner/end-bout))))
 
 (defn -main
   [addr-a addr-b & [arena-type more-args]]
@@ -52,4 +52,6 @@
         arena-type (keyword (or arena-type "simple"))]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
-    (main ctx addr-a addr-b arena-type)))
+    (-> (main ctx addr-a addr-b arena-type)
+        :final-result
+        (println))))

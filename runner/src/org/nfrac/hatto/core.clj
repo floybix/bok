@@ -121,7 +121,7 @@
         creature-b (creatures/build type-b world [10 10] -2)]
     {:world world
      :time 0.0
-     :timeout-secs 60
+     :timeout-secs Double/POSITIVE_INFINITY
      :dt-secs (/ 1 30.0)
      :dt-act-secs (/ 1 5.0)
      :last-act-time 0.0
