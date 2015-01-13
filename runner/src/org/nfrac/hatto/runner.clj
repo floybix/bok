@@ -27,41 +27,42 @@
   (zmq/send socket (to-transit msg)))
 
 (defn take-remote-actions
-  [state]
-  (if (core/act-now? state)
-    (let [{:keys [bout-id sock-a sock-b]} state
-          obs-a (core/perceive state :creature-a)
-          obs-b (core/perceive state :creature-b)]
+  [game]
+  (if (core/act-now? game)
+    (let [{:keys [bout-id sock-a sock-b]} game
+          obs-a (core/perceive game :creature-a)
+          obs-b (core/perceive game :creature-b)]
       (send-msg sock-a {:type :react, :bout-id bout-id, :data obs-a})
       (send-msg sock-b {:type :react, :bout-id bout-id, :data obs-b})
       (let [act-a (:data (recv-msg sock-a))
             act-b (:data (recv-msg sock-b))]
-        (core/act! (:creature-a (:entities state)) act-a)
-        (core/act! (:creature-b (:entities state)) act-b)
-        (assoc state :last-act-time (:time state))))
-    state))
+        (core/act! (:creature-a (:entities game)) act-a)
+        (core/act! (:creature-b (:entities game)) act-b)
+        (assoc game :last-act-time (:time game))))
+    game))
 
-(defn step
-  [state]
-  (if (:paused? state)
-    state
-    (-> state
-        (update-in [:world] step! (:dt-secs state))
-        (update-in [:time] + (:dt-secs state))
-        (take-remote-actions))))
+(defn step-remote
+  [game]
+  (-> game
+      (update-in [:world] step! (:dt-secs game))
+      (update-in [:time] + (:dt-secs game))
+      (take-remote-actions)))
 
 (defn run-bout
   [game]
   (loop [game game]
-    (if (:finished? game)
-      game
-      (recur (step game)))))
+    (if-let [res (core/final-result game)]
+      (assoc game :final-result res)
+      (recur (step-remote game)))))
 
 (defn end-bout
   [game]
-  (let [{:keys [bout-id sock-a sock-b]} game]
-    (send-msg sock-a {:type :finished, :bout-id bout-id})
-    (send-msg sock-b {:type :finished, :bout-id bout-id})
+  (let [{:keys [bout-id sock-a sock-b]} game
+        winner (:winner (:final-result game))
+        msg {:type :finished, :bout-id bout-id
+             :winner winner}]
+    (send-msg sock-a msg)
+    (send-msg sock-b msg)
     (assert (= :bye (:type (recv-msg sock-a))))
     (assert (= :bye (:type (recv-msg sock-b))))
     game))

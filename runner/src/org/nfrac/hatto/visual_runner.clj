@@ -2,18 +2,29 @@
   (:require [org.nfrac.hatto.runner :as runner]
             [org.nfrac.hatto.core :as core]
             [org.nfrac.cljbox2d.testbed :as bed]
-            [cljbox2d.core :refer [step!]]
             [quil.core :as quil]
             [quil.middleware]
             [zeromq.zmq :as zmq]))
 
-(defn run-with-display
+(defn step-remote
   [game]
+  (if (:paused? game)
+    game
+    (if-let [res (core/final-result game)]
+      (do
+        (quil/exit)
+        (assoc game :final-result res))
+      (runner/step-remote game))))
+
+(defn run-with-display
+  [game step]
   (let [p (promise)]
     (quil/sketch
      :title "Hatto"
-     :setup (fn [] (merge bed/initial-state game))
-     :update runner/step
+     :setup (fn []
+              (quil/frame-rate 30)
+              (merge bed/initial-state game))
+     :update step
      :draw bed/draw
      :key-typed bed/key-press
      :mouse-pressed bed/mouse-pressed
@@ -24,18 +35,21 @@
      :on-close (fn [state] (deliver p state)))
     @p))
 
+(defn main
+  [ctx addr-a addr-b arena-type]
+  (with-open [sock-a (doto (zmq/socket ctx :req)
+                       (zmq/connect addr-a))
+              sock-b (doto (zmq/socket ctx :req)
+                       (zmq/connect addr-b))]
+    (-> (runner/start-bout arena-type sock-a sock-b)
+        (run-with-display step-remote)
+        (runner/end-bout)
+        (println))))
+
 (defn -main
   [addr-a addr-b & [arena-type more-args]]
   (let [ctx (zmq/context 1)
         arena-type (keyword (or arena-type "simple"))]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
-    (with-open [sock-a (doto (zmq/socket ctx :req)
-                         (zmq/connect addr-a))
-                sock-b (doto (zmq/socket ctx :req)
-                         (zmq/connect addr-b))]
-      (println "connected.")
-      (-> (runner/start-bout arena-type sock-a sock-b)
-          (run-with-display)
-          (runner/end-bout)
-          (println)))))
+    (main ctx addr-a addr-b arena-type)))

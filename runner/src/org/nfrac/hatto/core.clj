@@ -61,14 +61,14 @@
    :angular-velocity (entity-angular-velocity entity)})
 
 (defn perceive
-  [state player-key]
-  (let [inv-dt (/ 1 (:dt-secs state))
-        me (get-in state [:entities player-key])
+  [game player-key]
+  (let [inv-dt (/ 1 (:dt-secs game))
+        me (get-in game [:entities player-key])
         obs (reduce-kv (fn [m k entity]
                          (assoc m k (perceive-entity entity inv-dt)))
                        {}
-                       (:entities state))]
-    {:time (:time state)
+                       (:entities game))]
+    {:time (:time game)
      :my-key player-key
      :entities obs}))
 
@@ -87,16 +87,31 @@
   (>= time (+ dt-act-secs last-act-time)))
 
 (defn take-actions
-  [state a-action-fn b-action-fn]
-  (if (act-now? state)
-    (let [obs-a (perceive state :creature-a)
-          obs-b (perceive state :creature-b)
+  [game a-action-fn b-action-fn]
+  (if (act-now? game)
+    (let [obs-a (perceive game :creature-a)
+          obs-b (perceive game :creature-b)
           act-a (a-action-fn obs-a)
           act-b (b-action-fn obs-b)]
-      (act! (:creature-a (:entities state)) act-a)
-      (act! (:creature-b (:entities state)) act-b)
-      (assoc state :last-act-time (:time state)))
-    state))
+      (act! (:creature-a (:entities game)) act-a)
+      (act! (:creature-b (:entities game)) act-b)
+      (assoc game :last-act-time (:time game)))
+    game))
+
+(defn final-result
+  [game]
+  (if (> (:time game)
+         (:timeout-secs game))
+    {:winner nil}
+    (let [dead (some (fn [player-key]
+                       (let [player (get-in game [:entities player-key])
+                             [x y] (-> player :components :head :body position)]
+                         (when (< y -2.0)
+                           ;; head has fallen 2m below ground level
+                           player-key)))
+                     (:player-keys game))]
+      (when dead
+        {:winner (first (disj (:player-keys game) dead))}))))
 
 (defn setup-game
   [arena-type type-a type-b]
@@ -106,6 +121,7 @@
         creature-b (creatures/build type-b world [10 10] -2)]
     {:world world
      :time 0.0
+     :timeout-secs 60
      :dt-secs (/ 1 30.0)
      :dt-act-secs (/ 1 5.0)
      :last-act-time 0.0
