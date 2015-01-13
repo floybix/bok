@@ -1,6 +1,7 @@
 (ns org.nfrac.hatto.examples.legge1
   (:require [org.nfrac.hatto.cljplayer :as serv]
-            [org.nfrac.hatto.cljplayer.util :as util :refer [abs angle-left? angle-up?]]))
+            [org.nfrac.hatto.cljplayer.util :as util
+             :refer [abs angle-left? angle-up? turn-down]]))
 
 (def ident {:creature-type :legge
             :name "Example legge1"
@@ -24,9 +25,14 @@
                       (:points ground))
         opp-angle (:angle-from-me opp-ft)
         dir (if (angle-left? opp-angle) 1 -1)
-        a-angle (-> me :components :limb-a1 :angle)
-        actions {:limb-a1-rj 10
-                 :limb-b1-rj (* 6 dir)}]
+        a2-angle (-> me :components :limb-a2 :angle)
+        b2-angle (-> me :components :limb-b2 :angle)
+        a2-sp (turn-down a2-angle 0.25)
+        b2-sp (turn-down b2-angle 0.25)
+        actions {:limb-a1-rj 1
+                 :limb-b1-rj 2
+                 :limb-a2-rj a2-sp
+                 :limb-b2-rj b2-sp}]
     (assoc state
       :actions actions)))
 

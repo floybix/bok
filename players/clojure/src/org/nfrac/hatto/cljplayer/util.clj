@@ -33,6 +33,21 @@
 
 (def angle-up? pos?)
 
+(defn turn-towards
+  "Returns a motor speed in radians per second (positive being
+   counter-clockwise, negative clockwise) to turn from the current
+   angle `ang` to `target-angle` in `s` seconds."
+  [ang target-angle s]
+  (let [ang (if (> ang HALF_PI)
+              (- ang (* 2 Math/PI))
+              ang)
+        ang-diff (- target-angle ang)]
+    (/ ang-diff s)))
+
+(defn turn-down
+  [ang s]
+  (turn-towards ang (- HALF_PI) s))
+
 (defn point-features
   [point eye]
   (let [{pos :position, vel :velocity} point

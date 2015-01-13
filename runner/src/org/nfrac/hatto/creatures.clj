@@ -51,6 +51,7 @@
                     {:shape (circle 0.5)
                      :density 5
                      :friction 0.5
+                     :fixed-rotation true
                      :group-index group-index})
         len 1.0
         limb-pois [[0.0 len]]
