@@ -32,7 +32,7 @@
   (let [bouts peek-ref]
     (while true
       (let [msg (recv-msg socket)]
-        (println msg)
+        (println (:type msg))
         (case (:type msg)
           :identify (send-msg socket (assoc ident
                                        :type :ident))
