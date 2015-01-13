@@ -30,7 +30,7 @@
 
 (defn setup []
   (quil/frame-rate 30)
-  (let [game (core/setup-game :legge :legge)]
+  (let [game (core/setup-game :simple :legge :legge)]
     (println "legge mass:"
              (-> game :entities :creature-a core/entity-mass))
     (merge bed/initial-state game)))

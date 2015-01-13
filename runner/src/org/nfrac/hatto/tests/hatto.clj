@@ -39,7 +39,7 @@
 
 (defn setup []
   (quil/frame-rate 30)
-  (let [game (core/setup-game :hatto :hatto)]
+  (let [game (core/setup-game :simple :hatto :hatto)]
     (println "hatto mass:"
              (-> game :entities :creature-a core/entity-mass))
     (merge bed/initial-state game)))

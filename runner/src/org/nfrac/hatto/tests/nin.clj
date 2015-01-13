@@ -8,7 +8,7 @@
 
 (defn a-action
   [info]
-  (clojure.pprint/pprint info)
+  ;(clojure.pprint/pprint info)
   {:limb-a-rj -5
    :limb-b-rj 0})
 
@@ -28,7 +28,7 @@
 
 (defn setup []
   (quil/frame-rate 30)
-  (let [game (core/setup-game :nin :nin)]
+  (let [game (core/setup-game :simple :nin :nin)]
     (println "nin mass:"
              (-> game :entities :creature-a core/entity-mass))
     (merge bed/initial-state game)))
