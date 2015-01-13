@@ -51,10 +51,10 @@ Or try running players over the wire:
 
 ```
 cd hatto/players/clojure
-lein run -m org.nfrac.hatto.examples.nin1 5555 &
-lein run -m org.nfrac.hatto.examples.nin1 5556 &
+lein run -m org.nfrac.hatto.examples.legge1 5555 &
+lein run -m org.nfrac.hatto.examples.legge1 5556 &
 cd hatto/runner
-lein run -m org.nfrac.hatto.visual-runner tcp://localhost:5555 tcp://localhost:5556
+lein run -m org.nfrac.hatto.visual-runner tcp://localhost:5555 tcp://localhost:5556 sandbox
 ```
 
 Or use the REPL: see [REPL session](https://github.com/floybix/hatto/wiki/REPL-session)
