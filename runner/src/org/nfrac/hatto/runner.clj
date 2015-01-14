@@ -34,6 +34,7 @@
           obs-b (core/perceive game :creature-b)]
       (send-msg sock-a {:type :react, :bout-id bout-id, :data obs-a})
       (send-msg sock-b {:type :react, :bout-id bout-id, :data obs-b})
+      ;; TODO detect if remote has died
       (let [act-a (:data (recv-msg sock-a))
             act-b (:data (recv-msg sock-b))]
         (core/act! (:creature-a (:entities game)) act-a)
@@ -94,17 +95,20 @@
 
 (defn -main
   [addr-a addr-b & [arena-type more-args]]
-  (let [ctx (zmq/context 1)
+  (let [ctx (zmq/zcontext 1)
         arena-type (keyword (or arena-type "simple"))]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
-    (with-open [sock-a (doto (zmq/socket ctx :req)
-                         (zmq/connect addr-a))
-                sock-b (doto (zmq/socket ctx :req)
-                         (zmq/connect addr-b))]
-      (println "connected.")
-      (-> (start-bout arena-type sock-a sock-b)
-          (run-bout)
-          (end-bout)
-          :final-result
-          (println)))))
+    (try
+      (let [sock-a (zmq/socket ctx :req)
+            sock-b (zmq/socket ctx :req)]
+        (zmq/connect sock-a addr-a)
+        (zmq/connect sock-b addr-b)
+        (-> (start-bout arena-type sock-a sock-b)
+            (run-bout)
+            (end-bout)
+            :final-result
+            (println)))
+      (finally
+        (println "closing ZMQ context")
+        (zmq/destroy ctx)))))

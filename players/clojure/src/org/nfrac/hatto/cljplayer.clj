@@ -1,7 +1,8 @@
 (ns org.nfrac.hatto.cljplayer
   (:require [zeromq.zmq :as zmq]
             [cognitect.transit :as transit])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
+  (:import ;[org.zeromq ZMQ ZMQException]
+           [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (defn to-transit
   [data]
@@ -32,7 +33,6 @@
   (let [bouts peek-ref]
     (while true
       (let [msg (recv-msg socket)]
-        (println (:type msg))
         (case (:type msg)
           :identify (send-msg socket (assoc ident
                                        :type :ident))
@@ -50,15 +50,20 @@
                    (swap! bouts assoc bout-id state))
           :finished (let [bout-id (:bout-id msg)]
                       (send-msg socket {:type :bye})
-                      (swap! bouts dissoc bout-id)))))))
+                      (swap! bouts dissoc bout-id))
+          (println "Unrecognised message type:" msg))))))
 
 (defn start-server
   [port ident action-fn peek-ref]
-  (let [ctx (zmq/context 1)
+  (let [ctx (zmq/zcontext 1)
         port (or port (zmq/first-free-port))
         addr (str "tcp://*:" port)]
     (println "starting server on TCP port " port)
-    (with-open [socket (doto (zmq/socket ctx :rep)
-                         (zmq/bind addr))]
-      (binding [*out* *err*]
-        (run-server socket ident action-fn peek-ref)))))
+    (try
+      (let [socket (zmq/socket ctx :rep)]
+        (zmq/bind socket addr)
+        (binding [*out* *err*]
+          (run-server socket ident action-fn peek-ref)))
+      (finally
+        (println "closing ZMQ context")
+        (zmq/destroy ctx)))))

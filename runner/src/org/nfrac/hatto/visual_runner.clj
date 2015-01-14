@@ -37,10 +37,10 @@
 
 (defn main
   [ctx addr-a addr-b arena-type]
-  (with-open [sock-a (doto (zmq/socket ctx :req)
-                       (zmq/connect addr-a))
-              sock-b (doto (zmq/socket ctx :req)
-                       (zmq/connect addr-b))]
+  (with-open [sock-a (zmq/socket ctx :req)
+              sock-b (zmq/socket ctx :req)]
+    (zmq/connect sock-a addr-a)
+    (zmq/connect sock-b addr-b)
     (-> (runner/start-bout arena-type sock-a sock-b)
         (assoc :timeout-secs Double/POSITIVE_INFINITY)
         (run-with-display step-remote)
@@ -48,10 +48,15 @@
 
 (defn -main
   [addr-a addr-b & [arena-type more-args]]
-  (let [ctx (zmq/context 1)
+  (let [ctx (zmq/zcontext 1)
         arena-type (keyword (or arena-type "simple"))]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
-    (-> (main ctx addr-a addr-b arena-type)
-        :final-result
-        (println))))
+    (try
+      (-> (main ctx addr-a addr-b arena-type)
+          :final-result
+          (println))
+      (finally
+        (println "closing ZMQ context")
+        (.setLinger ctx 500)
+        (zmq/destroy ctx)))))
