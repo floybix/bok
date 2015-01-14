@@ -1,8 +1,10 @@
 (ns org.nfrac.hatto.cljplayer.util)
 
-(def HALF_PI (/ Math/PI 2))
+(def PI Math/PI)
+(def HALF_PI (/ PI 2))
 
 (defn abs [x] (if (neg? x) (- x) x))
+(defn sign [x] (if (neg? x) -1 1))
 
 (defn v-angle
   "Angle of a 2d geometric vector in radians in range -pi to pi."
@@ -33,20 +35,27 @@
 
 (def angle-up? pos?)
 
+(defn angle-horiz?
+  [a epsilon]
+  (or (< (abs a) epsilon)
+      (> (abs a) (- Math/PI epsilon))))
+
 (defn turn-towards
   "Returns a motor speed in radians per second (positive being
-   counter-clockwise, negative clockwise) to turn from the current
-   angle `ang` to `target-angle` in `s` seconds."
-  [ang target-angle s]
-  (let [ang (if (> ang HALF_PI)
-              (- ang (* 2 Math/PI))
-              ang)
-        ang-diff (- target-angle ang)]
-    (/ ang-diff s)))
+   counter-clockwise, negative clockwise) to turn to `target-angle`
+   from the current angle `ang`. Speed is linear from a maximum of
+   `s-max` down to zero.
 
-(defn turn-down
-  [ang s]
-  (turn-towards ang (- HALF_PI) s))
+   This assumes that the joints have been constructed so that the
+   joint angle is aligned with the given angle values (presumably
+   world angles)."
+  [target-angle ang s-max]
+  (let [ang-diff (loop [d (- target-angle ang)]
+                   (cond
+                    (> d PI) (recur (- d (* 2 PI)))
+                    (< d (- PI)) (recur (+ d (* 2 PI)))
+                    :else d))]
+    (* ang-diff s-max (/ PI))))
 
 (defn point-features
   [point eye]

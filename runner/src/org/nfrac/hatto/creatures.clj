@@ -14,7 +14,7 @@
            :body-a body-a
            :body-b body-b
            :world-anchor world-anchor
-           :max-motor-torque 1000}))
+           :max-motor-torque 50}))
 
 (defmethod build :nin
   [type world position group-index]
@@ -34,8 +34,8 @@
                 :group-index group-index}
         limb-a (body! world {:position position} tri-fx)
         limb-b (body! world {:position position} tri-fx)
-        rj-a (revo-joint! limb-a head position)
-        rj-b (revo-joint! limb-b head position)]
+        rj-a (revo-joint! head limb-a position)
+        rj-b (revo-joint! head limb-b position)]
     (map->Entity
      {:entity-type :creature
       :creature-type type
@@ -47,22 +47,22 @@
 
 (defmethod build :legge
   [type world position group-index]
-  (let [head (body! world {:position position}
+  (let [head (body! world {:position position
+                           :fixed-rotation true}
                     {:shape (circle 0.5)
                      :density 5
                      :friction 0.5
-                     :fixed-rotation true
                      :group-index group-index})
         len 1.0
-        limb-pois [[0.0 len]]
+        limb-pois [[len 0.0]]
         thigh-fx {:shape (rod [0 0] 0 len 0.1)
-                  :density 10
+                  :density 20
                   :friction 0.5
                   :group-index group-index}
         limb-a1 (body! world {:position position} thigh-fx)
         limb-b1 (body! world {:position position} thigh-fx)
-        rj-a1 (revo-joint! limb-a1 head position)
-        rj-b1 (revo-joint! limb-b1 head position)
+        rj-a1 (revo-joint! head limb-a1 position)
+        rj-b1 (revo-joint! head limb-b1 position)
         calf-fx thigh-fx
         calf-pos (v-add position [len 0.0])
         limb-a2 (body! world {:position calf-pos} calf-fx)
@@ -90,39 +90,39 @@
                      :friction 0.5
                      :group-index group-index})
         thigh-len 1.0
-        thigh-pois [[0.0 thigh-len]]
+        thigh-pois [[thigh-len 0.0]]
         thigh-fx {:shape (rod [0 0] 0 thigh-len 0.1)
                   :density 10
                   :friction 0.5
                   :group-index group-index}
         limb-a (body! world {:position position} thigh-fx)
         limb-b (body! world {:position position} thigh-fx)
-        rj-a (revo-joint! limb-a head position)
-        rj-b (revo-joint! limb-b head position)
+        rj-a (revo-joint! head limb-a position)
+        rj-b (revo-joint! head limb-b position)
         calf-pos (v-add position [thigh-len 0.0])
         calf-len (* thigh-len 0.67)
-        calf-pois [[0.0 calf-len]]
+        calf-pois [[calf-len 0.0]]
         calf-fx (assoc thigh-fx :shape (rod [0 0] 0 calf-len 0.1))
         limb-aa (body! world {:position calf-pos} calf-fx)
         limb-ab (body! world {:position calf-pos} calf-fx)
         limb-ba (body! world {:position calf-pos} calf-fx)
-        rj-aa (revo-joint! limb-aa limb-a calf-pos)
-        rj-ab (revo-joint! limb-ab limb-a calf-pos)
-        rj-ba (revo-joint! limb-ba limb-b calf-pos)
+        rj-aa (revo-joint! limb-a limb-aa calf-pos)
+        rj-ab (revo-joint! limb-a limb-ab calf-pos)
+        rj-ba (revo-joint! limb-b limb-ba calf-pos)
         toe-pos (v-add calf-pos [calf-len 0.0])
         toe-len (* calf-len 0.67)
-        toe-pois [[0.0 toe-len]]
+        toe-pois [[toe-len 0.0]]
         toe-fx (assoc calf-fx :shape (rod [0 0] 0 toe-len 0.1))
         limb-aaa (body! world {:position toe-pos} toe-fx)
         limb-aab (body! world {:position toe-pos} toe-fx)
         limb-aba (body! world {:position toe-pos} toe-fx)
         limb-abb (body! world {:position toe-pos} toe-fx)
         limb-baa (body! world {:position toe-pos} toe-fx)
-        rj-aaa (revo-joint! limb-aaa limb-aa toe-pos)
-        rj-aab (revo-joint! limb-aab limb-aa toe-pos)
-        rj-aba (revo-joint! limb-aba limb-ab toe-pos)
-        rj-abb (revo-joint! limb-abb limb-ab toe-pos)
-        rj-baa (revo-joint! limb-baa limb-ba toe-pos)]
+        rj-aaa (revo-joint! limb-aa limb-aaa toe-pos)
+        rj-aab (revo-joint! limb-aa limb-aab toe-pos)
+        rj-aba (revo-joint! limb-ab limb-aba toe-pos)
+        rj-abb (revo-joint! limb-ab limb-abb toe-pos)
+        rj-baa (revo-joint! limb-ba limb-baa toe-pos)]
     (map->Entity
      {:entity-type :creature
       :creature-type type

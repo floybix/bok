@@ -123,7 +123,7 @@
      :time 0.0
      :timeout-secs Double/POSITIVE_INFINITY
      :dt-secs (/ 1 30.0)
-     :dt-act-secs (/ 1 5.0)
+     :dt-act-secs (/ 1 15.0)
      :last-act-time 0.0
      :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
      :player-keys #{:creature-a :creature-b}

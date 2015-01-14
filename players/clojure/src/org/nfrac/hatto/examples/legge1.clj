@@ -1,13 +1,18 @@
 (ns org.nfrac.hatto.examples.legge1
   (:require [org.nfrac.hatto.cljplayer :as serv]
             [org.nfrac.hatto.cljplayer.util :as util
-             :refer [abs angle-left? angle-up? turn-down]]))
+             :refer [abs angle-left? angle-up? turn-towards HALF_PI]]))
 
 (def ident {:creature-type :legge
             :name "Example legge1"
             :author "Felix Andrews <felix@nfrac.org>"
             :version "0.1.0-SNAPSHOT"
             :hatto-version "0.1.0-SNAPSHOT"})
+
+(def UP HALF_PI)
+(def DOWN (- HALF_PI))
+(def LEFT Math/PI)
+(def RIGHT 0.0)
 
 (defn my-action-fn
   [state]
@@ -25,14 +30,19 @@
                       (:points ground))
         opp-angle (:angle-from-me opp-ft)
         dir (if (angle-left? opp-angle) 1 -1)
+        a1-angle (-> me :components :limb-a1 :angle)
+        b1-angle (-> me :components :limb-b1 :angle)
         a2-angle (-> me :components :limb-a2 :angle)
         b2-angle (-> me :components :limb-b2 :angle)
-        a2-sp (turn-down a2-angle 0.25)
-        b2-sp (turn-down b2-angle 0.25)
-        actions {:limb-a1-rj 1
-                 :limb-b1-rj 2
+        a1-sp (* 5 dir)
+        b1-sp (* 4 dir)
+        a2-sp (turn-towards DOWN a2-angle 40)
+        b2-sp (turn-towards DOWN b2-angle 40)
+        actions {:limb-a1-rj a1-sp
+                 :limb-b1-rj b1-sp
                  :limb-a2-rj a2-sp
-                 :limb-b2-rj b2-sp}]
+                 :limb-b2-rj b2-sp
+                 }]
     (assoc state
       :actions actions)))
 
