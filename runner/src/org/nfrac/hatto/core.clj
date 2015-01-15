@@ -100,18 +100,20 @@
 
 (defn final-result
   [game]
-  (if (> (:time game)
-         (:timeout-secs game))
-    {:winner nil}
-    (let [dead (some (fn [player-key]
-                       (let [player (get-in game [:entities player-key])
-                             [x y] (-> player :components :head :body position)]
-                         (when (< y -2.0)
-                           ;; head has fallen 2m below ground level
-                           player-key)))
-                     (:player-keys game))]
-      (when dead
-        {:winner (first (disj (:player-keys game) dead))}))))
+  (if-let [err (:error game)]
+    {:error err}
+    (if (> (:time game)
+           (:gameover-secs game))
+      {:winner nil}
+      (let [dead (some (fn [player-key]
+                         (let [player (get-in game [:entities player-key])
+                               [x y] (-> player :components :head :body position)]
+                           (when (< y -2.0)
+                             ;; head has fallen 2m below ground level
+                             player-key)))
+                       (:player-keys game))]
+        (when dead
+          {:winner (first (disj (:player-keys game) dead))})))))
 
 (defn setup-game
   [arena-type type-a type-b]
@@ -121,7 +123,7 @@
         creature-b (creatures/build type-b world [10 10] -2)]
     {:world world
      :time 0.0
-     :timeout-secs Double/POSITIVE_INFINITY
+     :gameover-secs Double/POSITIVE_INFINITY
      :dt-secs (/ 1 30.0)
      :dt-act-secs (/ 1 15.0)
      :last-act-time 0.0

@@ -7,7 +7,7 @@
             :name "Example legge1"
             :author "Felix Andrews <felix@nfrac.org>"
             :version "0.1.0-SNAPSHOT"
-            :hatto-version "0.1.0-SNAPSHOT"})
+            :hatto-version [0 1 0]})
 
 (def UP HALF_PI)
 (def DOWN (- HALF_PI))

@@ -57,7 +57,8 @@ cd hatto/runner
 lein run -m org.nfrac.hatto.visual-runner tcp://localhost:5555 tcp://localhost:5556 sandbox
 ```
 
-Or use the REPL: see [REPL session](https://github.com/floybix/hatto/wiki/REPL-session)
+Or use the Clojure REPL: see
+[REPL session](https://github.com/floybix/hatto/wiki/REPL-session)
 
 
 ## License

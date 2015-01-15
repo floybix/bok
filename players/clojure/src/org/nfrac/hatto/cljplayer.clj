@@ -1,11 +1,10 @@
 (ns org.nfrac.hatto.cljplayer
-  (:require [zeromq.zmq :as zmq]
-            [cognitect.transit :as transit])
-  (:import ;[org.zeromq ZMQ ZMQException]
+  (:require [cognitect.transit :as transit])
+  (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (defn to-transit
-  [data]
+  ^bytes [data]
   (let [out (ByteArrayOutputStream.)
         writer (transit/writer out :json)]
     (transit/write writer data)
@@ -18,12 +17,14 @@
     (transit/read reader)))
 
 (defn recv-msg
-  [socket]
-  (from-transit (zmq/receive socket)))
+  [^ZMQ$Socket socket]
+  (or (from-transit (.recv socket))
+      (throw (Exception. "ZMQ recv failed."))))
 
 (defn send-msg
-  [socket msg]
-  (zmq/send socket (to-transit msg)))
+  [^ZMQ$Socket socket msg]
+  (or (.send socket (to-transit msg))
+      (throw (Exception. "ZMQ send failed."))))
 
 (defn run-server
   "Receives messages on the socket in an infinite loop. The atom
@@ -55,15 +56,16 @@
 
 (defn start-server
   [port ident action-fn peek-ref]
-  (let [ctx (zmq/zcontext 1)
-        port (or port (zmq/first-free-port))
+  (let [ctx (ZMQ/context 1)
         addr (str "tcp://*:" port)]
     (println "starting server on TCP port " port)
     (try
-      (let [socket (zmq/socket ctx :rep)]
-        (zmq/bind socket addr)
+      (with-open [socket (.socket ctx ZMQ/REP)]
+        (doto socket
+          (.bind addr)
+          (.setSendTimeOut 2000))
         (binding [*out* *err*]
           (run-server socket ident action-fn peek-ref)))
       (finally
         (println "closing ZMQ context")
-        (zmq/destroy ctx)))))
+        (.term ctx)))))

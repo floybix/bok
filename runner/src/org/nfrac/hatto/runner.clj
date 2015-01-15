@@ -1,12 +1,12 @@
 (ns org.nfrac.hatto.runner
   (:require [org.nfrac.hatto.core :as core]
             [cljbox2d.core :refer [step!]]
-            [zeromq.zmq :as zmq]
             [cognitect.transit :as transit])
-  (:import [java.io ByteArrayInputStream ByteArrayOutputStream]))
+  (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
+           [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
 (defn to-transit
-  [data]
+  ^bytes [data]
   (let [out (ByteArrayOutputStream.)
         writer (transit/writer out :json)]
     (transit/write writer data)
@@ -19,12 +19,15 @@
     (transit/read reader)))
 
 (defn recv-msg
-  [socket]
-  (from-transit (zmq/receive socket)))
+  [^ZMQ$Socket socket]
+  (from-transit
+   (or (.recv socket)
+       (throw (ZMQException. 0))))) ;; TODO
 
 (defn send-msg
-  [socket msg]
-  (zmq/send socket (to-transit msg)))
+  [^ZMQ$Socket socket msg]
+  (or (.send socket (to-transit msg))
+      (throw (ZMQException. 0)))) ;; TODO
 
 (defn take-remote-actions
   [game]
@@ -34,20 +37,23 @@
           obs-b (core/perceive game :creature-b)]
       (send-msg sock-a {:type :react, :bout-id bout-id, :data obs-a})
       (send-msg sock-b {:type :react, :bout-id bout-id, :data obs-b})
-      ;; TODO detect if remote has died
-      (let [act-a (:data (recv-msg sock-a))
-            act-b (:data (recv-msg sock-b))]
-        (core/act! (:creature-a (:entities game)) act-a)
-        (core/act! (:creature-b (:entities game)) act-b)
-        (assoc game :last-act-time (:time game))))
+      (doseq [[player-key sock] [[:creature-a sock-a]
+                                 [:creature-b sock-b]]]
+        (let [msg (recv-msg sock)
+              actions (:data msg)]
+          (core/act! (get-in game [:entities player-key]) actions)))
+      (assoc game :last-act-time (:time game)))
     game))
 
 (defn step-remote
   [game]
-  (-> game
-      (update-in [:world] step! (:dt-secs game))
-      (update-in [:time] + (:dt-secs game))
-      (take-remote-actions)))
+  (try
+    (-> game
+        (update-in [:world] step! (:dt-secs game))
+        (update-in [:time] + (:dt-secs game))
+        (take-remote-actions))
+    (catch ZMQException e
+      (assoc game :error (str e)))))
 
 (defn run-bout
   [game]
@@ -59,13 +65,18 @@
 (defn end-bout
   [game]
   (let [{:keys [bout-id sock-a sock-b]} game
-        winner (:winner (:final-result game))
-        msg {:type :finished, :bout-id bout-id
-             :winner winner}]
-    (send-msg sock-a msg)
-    (send-msg sock-b msg)
-    (assert (= :bye (:type (recv-msg sock-a))))
-    (assert (= :bye (:type (recv-msg sock-b))))
+        result (:final-result game)]
+    (if (:error result)
+      (do
+        ;; something
+        )
+      (let [winner (:winner (result))
+            msg {:type :finished, :bout-id bout-id
+                 :winner winner}]
+        (send-msg sock-a msg)
+        (send-msg sock-b msg)
+        (assert (= :bye (:type (recv-msg sock-a))))
+        (assert (= :bye (:type (recv-msg sock-b))))))
     game))
 
 (defn start-bout
@@ -76,6 +87,9 @@
     (send-msg sock-b {:type :invite, :bout-id bout-id})
     (assert (= :join (:type (recv-msg sock-a))))
     (assert (= :join (:type (recv-msg sock-b))))
+    (doseq [^ZMQ$Socket socket [sock-a sock-b]]
+      (.setSendTimeOut socket 1000)
+      (.setReceiveTimeOut socket 1000))
     (println "identifying players.")
     (send-msg sock-a {:type :identify})
     (send-msg sock-b {:type :identify})
@@ -86,29 +100,33 @@
       (-> (core/setup-game arena-type
                            (:creature-type ident-a)
                            (:creature-type ident-b))
-          (assoc :timeout-secs 60
+          (assoc :gameover-secs 60
                  :bout-id bout-id
                  :ident-a ident-a
                  :ident-b ident-b
                  :sock-a sock-a
                  :sock-b sock-b)))))
 
+(defn main
+  [^ZMQ$Context ctx addr-a addr-b arena-type]
+  (with-open [sock-a (.socket ctx ZMQ/REQ)
+              sock-b (.socket ctx ZMQ/REQ)]
+    (.connect sock-a addr-a)
+    (.connect sock-b addr-b)
+    (-> (start-bout arena-type sock-a sock-b)
+        (run-bout)
+        (end-bout))))
+
 (defn -main
   [addr-a addr-b & [arena-type more-args]]
-  (let [ctx (zmq/zcontext 1)
+  (let [ctx (ZMQ/context 1)
         arena-type (keyword (or arena-type "simple"))]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
     (try
-      (let [sock-a (zmq/socket ctx :req)
-            sock-b (zmq/socket ctx :req)]
-        (zmq/connect sock-a addr-a)
-        (zmq/connect sock-b addr-b)
-        (-> (start-bout arena-type sock-a sock-b)
-            (run-bout)
-            (end-bout)
-            :final-result
-            (println)))
+      (-> (main ctx addr-a addr-b arena-type)
+          :final-result
+          (println))
       (finally
         (println "closing ZMQ context")
-        (zmq/destroy ctx)))))
+        (.term ctx)))))

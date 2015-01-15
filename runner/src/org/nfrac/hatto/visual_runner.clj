@@ -3,8 +3,8 @@
             [org.nfrac.hatto.core :as core]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
-            [quil.middleware]
-            [zeromq.zmq :as zmq]))
+            [quil.middleware])
+  (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]))
 
 (defn step-remote
   [game]
@@ -36,19 +36,19 @@
     @p))
 
 (defn main
-  [ctx addr-a addr-b arena-type]
-  (with-open [sock-a (zmq/socket ctx :req)
-              sock-b (zmq/socket ctx :req)]
-    (zmq/connect sock-a addr-a)
-    (zmq/connect sock-b addr-b)
+  [^ZMQ$Context ctx addr-a addr-b arena-type]
+  (with-open [sock-a (.socket ctx ZMQ/REQ)
+              sock-b (.socket ctx ZMQ/REQ)]
+    (.connect sock-a addr-a)
+    (.connect sock-b addr-b)
     (-> (runner/start-bout arena-type sock-a sock-b)
-        (assoc :timeout-secs Double/POSITIVE_INFINITY)
+        (assoc :gameover-secs Double/POSITIVE_INFINITY)
         (run-with-display step-remote)
         (runner/end-bout))))
 
 (defn -main
   [addr-a addr-b & [arena-type more-args]]
-  (let [ctx (zmq/zcontext 1)
+  (let [ctx (ZMQ/context 1)
         arena-type (keyword (or arena-type "simple"))]
     (println "connecting to" addr-a)
     (println "connecting to" addr-b)
@@ -58,5 +58,4 @@
           (println))
       (finally
         (println "closing ZMQ context")
-        (.setLinger ctx 500)
-        (zmq/destroy ctx)))))
+        (.term ctx)))))
