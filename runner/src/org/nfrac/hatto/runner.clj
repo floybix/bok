@@ -70,7 +70,7 @@
       (do
         ;; something
         )
-      (let [winner (:winner (result))
+      (let [winner (:winner result)
             msg {:type :finished, :bout-id bout-id
                  :winner winner}]
         (send-msg sock-a msg)

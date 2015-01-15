@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.tests.hatto
+(ns org.nfrac.hatto.tests.hugh
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.visual-runner :as visrun]
             [cljbox2d.core :refer [step! mass]]
@@ -7,25 +7,16 @@
 
 (defn a-action
   [info]
-  {:limb-b-rj 1
-   :limb-ba-rj 2
-   :limb-baa-rj 3
-   :limb-a-rj -1
-   :limb-aa-rj 2
-   :limb-aaa-rj 3
-   })
+  {:arm-a1-rj -10
+   :arm-b1-rj -2
+   :leg-a2-rj 5
+   :leg-b2-rj 2})
 
 (defn b-action
   [info]
-  ;(clojure.pprint/pprint info)
-  {:limb-a-rj 0
-   :limb-b-rj 2
-   :limb-aa-rj -5
-   :limb-ab-rj 0
-   :limb-aaa-rj 1
-   :limb-aab-rj 1
-   :limb-aba-rj 1
-   :limb-abb-rj 1})
+  {:leg-a1-rj 5
+   :leg-b1-rj 0
+   :leg-a2-rj -8})
 
 (defn step-local
   [game]
@@ -43,8 +34,8 @@
 (defn -main
   "Run the test sketch."
   [& args]
-  (let [game (core/setup-game :simple :hatto :hatto)]
-    (println "hatto mass:"
+  (let [game (core/setup-game :simple :hugh :hugh)]
+    (println "hugh mass:"
              (-> game :entities :creature-a core/entity-mass))
     (-> game
         (visrun/run-with-display step-local)

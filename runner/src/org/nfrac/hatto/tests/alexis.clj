@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.tests.legge
+(ns org.nfrac.hatto.tests.alexis
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.visual-runner :as visrun]
             [cljbox2d.core :refer [step! mass]]
@@ -7,15 +7,16 @@
 
 (defn a-action
   [info]
-  {:limb-a1-rj 0
-   :limb-b1-rj 0
-   :limb-a2-rj -5
-   :limb-b2-rj 0})
+  {:limb-a1-rj -10
+   :limb-b1-rj -2
+   :limb-a2-rj 5
+   :limb-b2-rj 2})
 
 (defn b-action
   [info]
   {:limb-a1-rj 5
-   :limb-b1-rj 0})
+   :limb-b1-rj 0
+   :limb-a2-rj -8})
 
 (defn step-local
   [game]
@@ -33,8 +34,8 @@
 (defn -main
   "Run the test sketch."
   [& args]
-  (let [game (core/setup-game :simple :legge :legge)]
-    (println "legge mass:"
+  (let [game (core/setup-game :simple :alexis :alexis)]
+    (println "alexis mass:"
              (-> game :entities :creature-a core/entity-mass))
     (-> game
         (visrun/run-with-display step-local)

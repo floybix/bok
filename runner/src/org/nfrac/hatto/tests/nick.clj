@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.tests.nin
+(ns org.nfrac.hatto.tests.nick
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.visual-runner :as visrun]
             [cljbox2d.core :refer [step! mass]]
@@ -7,14 +7,14 @@
 
 (defn a-action
   [info]
-  ;(clojure.pprint/pprint info)
-  {:limb-a-rj -5
-   :limb-b-rj 0})
+  {:seg-1-rj 8
+   :seg-2-rj 0
+   :seg-6-rj 5})
 
 (defn b-action
   [info]
-  {:limb-a-rj 5
-   :limb-b-rj nil})
+  {:seg-2-rj -10
+   :seg-3-rj -5})
 
 (defn step-local
   [game]
@@ -32,8 +32,8 @@
 (defn -main
   "Run the test sketch."
   [& args]
-  (let [game (core/setup-game :simple :nin :nin)]
-    (println "nin mass:"
+  (let [game (core/setup-game :simple :nick :nick)]
+    (println "nick mass:"
              (-> game :entities :creature-a core/entity-mass))
     (-> game
         (visrun/run-with-display step-local)

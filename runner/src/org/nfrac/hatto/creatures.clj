@@ -16,36 +16,30 @@
            :world-anchor world-anchor
            :max-motor-torque 50}))
 
-(defmethod build :nin
-  [type world position group-index]
-  (let [head (body! world {:position position}
-                    {:shape (circle 0.5)
-                     :density 5
-                     :friction 0.5
-                     :group-index group-index})
-        tri-pts [[0.0 0.3]
-                 [0.9 -0.4]
-                 [-0.7 -0.4]]
-        ;; first vertex internal so not a Point Of Interest
-        tri-pois (drop 1 tri-pts)
-        tri-fx {:shape (polygon tri-pts)
-                :density 5
-                :friction 0.5
-                :group-index group-index}
-        limb-a (body! world {:position position} tri-fx)
-        limb-b (body! world {:position position} tri-fx)
-        rj-a (revo-joint! head limb-a position)
-        rj-b (revo-joint! head limb-b position)]
-    (map->Entity
-     {:entity-type :creature
-      :creature-type type
-      :components {:head (->BodyPois head [[0 0]])
-                   :limb-a (->BodyPois limb-a tri-pois)
-                   :limb-b (->BodyPois limb-b tri-pois)}
-      :joints {:limb-a-rj rj-a
-               :limb-b-rj rj-b}})))
+(defn limb
+  [world host position seg-len fixture-spec
+   & {:keys [width n-segments prefix]
+      :or {width 0.1, n-segments 2, prefix "seg-"}}]
+  (let [pois [[seg-len 0.0]]
+        seg-fx (assoc fixture-spec
+                 :shape (rod [0 0] 0 seg-len width))
+        segs (reduce (fn [segs i]
+                       (let [pos (v-add position [(* i seg-len) 0.0])
+                             seg (body! world {:position pos}
+                                        seg-fx)
+                             prev (or (:body (:component (peek segs)))
+                                      host)
+                             rj (revo-joint! prev seg pos)]
+                         (conj segs {:key (keyword (str prefix (inc i)))
+                                     :joint-key (keyword (str prefix (inc i) "-rj"))
+                                     :component (->BodyPois seg pois)
+                                     :joint rj})))
+                     []
+                     (range n-segments))]
+    {:components (into {} (map (juxt :key :component) segs))
+     :joints (into {} (map (juxt :joint-key :joint) segs))}))
 
-(defmethod build :legge
+(defmethod build :alexis
   [type world position group-index]
   (let [head (body! world {:position position
                            :fixed-rotation true}
@@ -53,98 +47,83 @@
                      :density 5
                      :friction 0.5
                      :group-index group-index})
-        len 1.0
-        limb-pois [[len 0.0]]
-        thigh-fx {:shape (rod [0 0] 0 len 0.1)
-                  :density 20
-                  :friction 0.5
-                  :group-index group-index}
-        limb-a1 (body! world {:position position} thigh-fx)
-        limb-b1 (body! world {:position position} thigh-fx)
-        rj-a1 (revo-joint! head limb-a1 position)
-        rj-b1 (revo-joint! head limb-b1 position)
-        calf-fx thigh-fx
-        calf-pos (v-add position [len 0.0])
-        limb-a2 (body! world {:position calf-pos} calf-fx)
-        limb-b2 (body! world {:position calf-pos} calf-fx)
-        rj-a2 (revo-joint! limb-a1 limb-a2 calf-pos)
-        rj-b2 (revo-joint! limb-b1 limb-b2 calf-pos)]
+        limb-spec {:density 20
+                   :friction 0.5
+                   :group-index group-index}
+        limbs (merge-with
+               merge
+               (limb world head position 1.0 limb-spec
+                     :n-segments 2 :prefix "limb-a")
+               (limb world head position 1.0 limb-spec
+                     :n-segments 2 :prefix "limb-b"))]
     (map->Entity
      {:entity-type :creature
       :creature-type type
-      :components {:head (->BodyPois head [[0 0]])
-                   :limb-a1 (->BodyPois limb-a1 limb-pois)
-                   :limb-b1 (->BodyPois limb-b1 limb-pois)
-                   :limb-a2 (->BodyPois limb-a2 limb-pois)
-                   :limb-b2 (->BodyPois limb-b2 limb-pois)}
-      :joints {:limb-a1-rj rj-a1
-               :limb-b1-rj rj-b1
-               :limb-a2-rj rj-a2
-               :limb-b2-rj rj-b2}})))
+      :components (assoc (:components limbs)
+                    :head (->BodyPois head [[0 0]]))
+      :joints (:joints limbs)})))
 
-(defmethod build :hatto
+(defmethod build :hugh
   [type world position group-index]
   (let [head (body! world {:position position}
-                    {:shape (circle 0.5)
+                    {:shape (circle 0.25)
                      :density 5
                      :friction 0.5
                      :group-index group-index})
-        thigh-len 1.0
-        thigh-pois [[thigh-len 0.0]]
-        thigh-fx {:shape (rod [0 0] 0 thigh-len 0.1)
-                  :density 10
-                  :friction 0.5
-                  :group-index group-index}
-        limb-a (body! world {:position position} thigh-fx)
-        limb-b (body! world {:position position} thigh-fx)
-        rj-a (revo-joint! head limb-a position)
-        rj-b (revo-joint! head limb-b position)
-        calf-pos (v-add position [thigh-len 0.0])
-        calf-len (* thigh-len 0.67)
-        calf-pois [[calf-len 0.0]]
-        calf-fx (assoc thigh-fx :shape (rod [0 0] 0 calf-len 0.1))
-        limb-aa (body! world {:position calf-pos} calf-fx)
-        limb-ab (body! world {:position calf-pos} calf-fx)
-        limb-ba (body! world {:position calf-pos} calf-fx)
-        rj-aa (revo-joint! limb-a limb-aa calf-pos)
-        rj-ab (revo-joint! limb-a limb-ab calf-pos)
-        rj-ba (revo-joint! limb-b limb-ba calf-pos)
-        toe-pos (v-add calf-pos [calf-len 0.0])
-        toe-len (* calf-len 0.67)
-        toe-pois [[toe-len 0.0]]
-        toe-fx (assoc calf-fx :shape (rod [0 0] 0 toe-len 0.1))
-        limb-aaa (body! world {:position toe-pos} toe-fx)
-        limb-aab (body! world {:position toe-pos} toe-fx)
-        limb-aba (body! world {:position toe-pos} toe-fx)
-        limb-abb (body! world {:position toe-pos} toe-fx)
-        limb-baa (body! world {:position toe-pos} toe-fx)
-        rj-aaa (revo-joint! limb-aa limb-aaa toe-pos)
-        rj-aab (revo-joint! limb-aa limb-aab toe-pos)
-        rj-aba (revo-joint! limb-ab limb-aba toe-pos)
-        rj-abb (revo-joint! limb-ab limb-abb toe-pos)
-        rj-baa (revo-joint! limb-ba limb-baa toe-pos)]
+        torso-pos (v-add position [0.0 0.75])
+        torso-pts [[0.00 0.50]
+                   [-0.25 0.25]
+                   [-0.25 -0.25]
+                   [0.00 -0.50]
+                   [0.25 -0.25]
+                   [0.25 0.25]]
+        torso-pois [[-0.25 0.0]
+                    [0.25 0.0]]
+        torso (body! world {:position torso-pos}
+                     {:shape (polygon torso-pts)
+                      :density 5
+                      :friction 0.5
+                      :group-index group-index})
+        wj (joint! {:type :weld :body-a head :body-b torso
+                    :world-anchor position})
+        limb-spec {:density 20
+                   :friction 0.5
+                   :group-index group-index}
+        arm-pos (v-add torso-pos [0.0 -0.40])
+        leg-pos (v-add torso-pos [0.0 0.40])
+        limbs (merge-with
+               merge
+               (limb world torso arm-pos 0.75 limb-spec
+                     :n-segments 2 :prefix "arm-a")
+               (limb world torso arm-pos 0.75 limb-spec
+                     :n-segments 2 :prefix "arm-b")
+               (limb world torso leg-pos 0.75 limb-spec
+                     :n-segments 2 :prefix "leg-a")
+               (limb world torso leg-pos 0.75 limb-spec
+                     :n-segments 2 :prefix "leg-b"))]
     (map->Entity
      {:entity-type :creature
       :creature-type type
-      :components {:head (->BodyPois head [[0 0]])
-                   :limb-a (->BodyPois limb-a thigh-pois)
-                   :limb-b (->BodyPois limb-a thigh-pois)
-                   :limb-aa (->BodyPois limb-aa calf-pois)
-                   :limb-ab (->BodyPois limb-ab calf-pois)
-                   :limb-ba (->BodyPois limb-ba calf-pois)
-                   :limb-aaa (->BodyPois limb-aaa toe-pois)
-                   :limb-aab (->BodyPois limb-aab toe-pois)
-                   :limb-aba (->BodyPois limb-aba toe-pois)
-                   :limb-abb (->BodyPois limb-abb toe-pois)
-                   :limb-baa (->BodyPois limb-baa toe-pois)}
-      :joints {:limb-a-rj rj-a
-               :limb-b-rj rj-a
-               :limb-aa-rj rj-aa
-               :limb-ab-rj rj-ab
-               :limb-ba-rj rj-ba
-               :limb-aaa-rj rj-aaa
-               :limb-aab-rj rj-aab
-               :limb-aba-rj rj-aba
-               :limb-abb-rj rj-abb
-               :limb-baa-rj rj-baa}})))
+      :components (assoc (:components limbs)
+                    :head (->BodyPois head [[0 0]])
+                    :torso (->BodyPois torso torso-pois))
+      :joints (:joints limbs)})))
 
+(defmethod build :nick
+  [type world position group-index]
+  (let [head (body! world {:position position}
+                    {:shape (circle 0.25)
+                     :density 5
+                     :friction 0.5
+                     :group-index group-index})
+        limb-spec {:density 10
+                   :friction 0.5
+                   :group-index group-index}
+        segs (limb world head position 1.0 limb-spec
+                   :n-segments 6 :prefix "seg-")]
+    (map->Entity
+     {:entity-type :creature
+      :creature-type type
+      :components (assoc (:components segs)
+                    :head (->BodyPois head [[0 0]]))
+      :joints (:joints segs)})))

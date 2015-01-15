@@ -18,8 +18,9 @@
 
 (defn recv-msg
   [^ZMQ$Socket socket]
-  (or (from-transit (.recv socket))
-      (throw (Exception. "ZMQ recv failed."))))
+  (from-transit
+   (or (.recv socket)
+       (throw (Exception. "ZMQ recv failed.")))))
 
 (defn send-msg
   [^ZMQ$Socket socket msg]
