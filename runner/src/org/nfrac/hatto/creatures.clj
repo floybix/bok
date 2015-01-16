@@ -70,7 +70,7 @@
                      :density 5
                      :friction 0.5
                      :group-index group-index})
-        torso-pos (v-add position [0.0 0.75])
+        torso-pos (v-add position [0.0 -0.75])
         torso-pts [[0.00 0.50]
                    [-0.25 0.25]
                    [-0.25 -0.25]
@@ -89,8 +89,8 @@
         limb-spec {:density 10
                    :friction 0.5
                    :group-index group-index}
-        arm-pos (v-add torso-pos [0.0 -0.40])
-        leg-pos (v-add torso-pos [0.0 0.40])
+        arm-pos (v-add torso-pos [0.0 0.40])
+        leg-pos (v-add torso-pos [0.0 -0.40])
         limbs (merge-with
                merge
                (limb world torso arm-pos 0.75 limb-spec

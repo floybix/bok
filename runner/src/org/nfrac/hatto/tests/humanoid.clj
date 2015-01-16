@@ -14,9 +14,7 @@
 
 (defn b-action
   [info]
-  {:leg-a1-rj 5
-   :leg-b1-rj 0
-   :leg-a2-rj -8})
+  {})
 
 (defn step-local
   [game]
