@@ -14,7 +14,7 @@
            :body-a body-a
            :body-b body-b
            :world-anchor world-anchor
-           :max-motor-torque 50}))
+           :max-motor-torque 100}))
 
 (defn limb
   [world host position seg-len fixture-spec
@@ -39,7 +39,7 @@
     {:components (into {} (map (juxt :key :component) segs))
      :joints (into {} (map (juxt :joint-key :joint) segs))}))
 
-(defmethod build :alexis
+(defmethod build :legsoid
   [type world position group-index]
   (let [head (body! world {:position position
                            :fixed-rotation true}
@@ -47,7 +47,7 @@
                      :density 5
                      :friction 0.5
                      :group-index group-index})
-        limb-spec {:density 20
+        limb-spec {:density 10
                    :friction 0.5
                    :group-index group-index}
         limbs (merge-with
@@ -63,7 +63,7 @@
                     :head (->BodyPois head [[0 0]]))
       :joints (:joints limbs)})))
 
-(defmethod build :hugh
+(defmethod build :humanoid
   [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.25)
@@ -86,7 +86,7 @@
                       :group-index group-index})
         wj (joint! {:type :weld :body-a head :body-b torso
                     :world-anchor position})
-        limb-spec {:density 20
+        limb-spec {:density 10
                    :friction 0.5
                    :group-index group-index}
         arm-pos (v-add torso-pos [0.0 -0.40])
@@ -109,7 +109,7 @@
                     :torso (->BodyPois torso torso-pois))
       :joints (:joints limbs)})))
 
-(defmethod build :nick
+(defmethod build :wormoid
   [type world position group-index]
   (let [head (body! world {:position position}
                     {:shape (circle 0.25)

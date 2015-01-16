@@ -1,10 +1,10 @@
-(ns org.nfrac.hatto.examples.alexis1
+(ns org.nfrac.hatto.examples.legsoid1
   (:require [org.nfrac.hatto.cljplayer :as serv]
             [org.nfrac.hatto.cljplayer.util :as util
              :refer [abs angle-left? angle-up? turn-towards HALF_PI]]))
 
-(def ident {:creature-type :alexis
-            :name "Example alexis1"
+(def ident {:creature-type :legsoid
+            :name "Example legsoid1"
             :author "Felix Andrews <felix@nfrac.org>"
             :version "0.1.0-SNAPSHOT"
             :hatto-version [0 1 0]})

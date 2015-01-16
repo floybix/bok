@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.tests.alexis
+(ns org.nfrac.hatto.tests.legsoid
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.visual-runner :as visrun]
             [cljbox2d.core :refer [step! mass]]
@@ -34,8 +34,8 @@
 (defn -main
   "Run the test sketch."
   [& args]
-  (let [game (core/setup-game :simple :alexis :alexis)]
-    (println "alexis mass:"
+  (let [game (core/setup-game :simple :legsoid :legsoid)]
+    (println "legsoid mass:"
              (-> game :entities :creature-a core/entity-mass))
     (-> game
         (visrun/run-with-display step-local)

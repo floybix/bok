@@ -42,17 +42,17 @@ Then you can run basic in-process demos:
 
 ```
 cd hatto/runner
-lein run -m org.nfrac.hatto.tests.alexis
-lein run -m org.nfrac.hatto.tests.hugh
-lein run -m org.nfrac.hatto.tests.nick
+lein run -m org.nfrac.hatto.tests.legsoid
+lein run -m org.nfrac.hatto.tests.humanoid
+lein run -m org.nfrac.hatto.tests.wormoid
 ```
 
 Or try running players over the wire:
 
 ```
 cd hatto/players/clojure
-lein run -m org.nfrac.hatto.examples.alexis1 5555 &
-lein run -m org.nfrac.hatto.examples.alexis1 5556 &
+lein run -m org.nfrac.hatto.examples.legsoid1 5555 &
+lein run -m org.nfrac.hatto.examples.legsoid1 5556 &
 cd hatto/runner
 lein run -m org.nfrac.hatto.visual-runner tcp://localhost:5555 tcp://localhost:5556 sandbox
 ```

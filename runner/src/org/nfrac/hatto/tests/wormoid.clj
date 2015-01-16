@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.tests.hugh
+(ns org.nfrac.hatto.tests.wormoid
   (:require [org.nfrac.hatto.core :as core]
             [org.nfrac.hatto.visual-runner :as visrun]
             [cljbox2d.core :refer [step! mass]]
@@ -7,16 +7,14 @@
 
 (defn a-action
   [info]
-  {:arm-a1-rj -10
-   :arm-b1-rj -2
-   :leg-a2-rj 5
-   :leg-b2-rj 2})
+  {:seg-1-rj 8
+   :seg-2-rj 0
+   :seg-6-rj 5})
 
 (defn b-action
   [info]
-  {:leg-a1-rj 5
-   :leg-b1-rj 0
-   :leg-a2-rj -8})
+  {:seg-2-rj -10
+   :seg-3-rj -5})
 
 (defn step-local
   [game]
@@ -34,8 +32,8 @@
 (defn -main
   "Run the test sketch."
   [& args]
-  (let [game (core/setup-game :simple :hugh :hugh)]
-    (println "hugh mass:"
+  (let [game (core/setup-game :simple :wormoid :wormoid)]
+    (println "wormoid mass:"
              (-> game :entities :creature-a core/entity-mass))
     (-> game
         (visrun/run-with-display step-local)
