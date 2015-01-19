@@ -1,5 +1,5 @@
 (ns org.nfrac.hatto.games
-  (:require [org.nfrac.hatto.entities :as ent :refer [->BodyPois map->Entity]]
+  (:require [org.nfrac.hatto.entities :as ent :refer [with-pois map->Entity]]
             [org.nfrac.hatto.creatures :as creatures]
             [cljbox2d.core :refer :all]))
 
@@ -58,7 +58,7 @@
   [game y-val]
   (let [dead (filter (fn [player-key]
                        (let [player (get-in game [:entities player-key])
-                             head (-> player :components :head :body)
+                             head (-> player :components :head)
                              [x y] (position head)]
                          ;; head has fallen below death level
                          (< y y-val)))
@@ -115,7 +115,7 @@
         arena (map->Entity
                {:entity-type :arena
                 :arena-type type
-                :components {:ground (->BodyPois ground pois)}})
+                :components {:ground (with-pois ground pois)}})
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (-> (assoc empty-game
           :world world
@@ -133,7 +133,7 @@
         arena (map->Entity
                {:entity-type :arena
                 :arena-type type
-                :components {:ground (->BodyPois ground pois)}})
+                :components {:ground (with-pois ground pois)}})
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (->
      (assoc empty-game

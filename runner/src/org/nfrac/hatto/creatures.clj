@@ -1,5 +1,5 @@
 (ns org.nfrac.hatto.creatures
-  (:require [org.nfrac.hatto.entities :refer [->BodyPois map->Entity]]
+  (:require [org.nfrac.hatto.entities :refer [with-pois map->Entity]]
             [cljbox2d.core :refer :all]
             [cljbox2d.joints :refer :all]
             [cljbox2d.vec2d :refer [v-add]]))
@@ -27,12 +27,12 @@
                        (let [pos (v-add position [(* i seg-len) 0.0])
                              seg (body! world {:position pos}
                                         seg-fx)
-                             prev (or (:body (:component (peek segs)))
+                             prev (or (:component (peek segs))
                                       host)
                              rj (revo-joint! prev seg pos)]
                          (conj segs {:key (keyword (str prefix (inc i)))
                                      :joint-key (keyword (str prefix (inc i) "-rj"))
-                                     :component (->BodyPois seg pois)
+                                     :component (with-pois seg pois)
                                      :joint rj})))
                      []
                      (range n-segments))]
@@ -60,7 +60,7 @@
      {:entity-type :creature
       :creature-type type
       :components (assoc (:components limbs)
-                    :head (->BodyPois head [[0 0]]))
+                    :head (with-pois head [[0 0]]))
       :joints (:joints limbs)})))
 
 (defmethod build :humanoid
@@ -105,8 +105,8 @@
      {:entity-type :creature
       :creature-type type
       :components (assoc (:components limbs)
-                    :head (->BodyPois head [[0 0]])
-                    :torso (->BodyPois torso torso-pois))
+                    :head (with-pois head [[0 0]])
+                    :torso (with-pois torso torso-pois))
       :joints (:joints limbs)})))
 
 (defmethod build :wormoid
@@ -125,5 +125,5 @@
      {:entity-type :creature
       :creature-type type
       :components (assoc (:components segs)
-                    :head (->BodyPois head [[0 0]]))
+                    :head (with-pois head [[0 0]]))
       :joints (:joints segs)})))

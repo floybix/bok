@@ -1,6 +1,6 @@
 (ns org.nfrac.hatto.visual-runner
   (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
-            [cljbox2d.core :refer [position center angle]]
+            [cljbox2d.core :refer [position center angle user-data]]
             [cljbox2d.joints :refer [body-a body-b anchor-a joint-angle]]
             [cljbox2d.vec2d :refer [v-dist]]
             [org.nfrac.cljbox2d.testbed :as bed]
@@ -29,9 +29,9 @@
                  10 10)
       (doseq [[ent-key ent] (dissoc (:entities game) :arena)
               :let [{:keys [components joints]} ent
-                    mid-x (mean (map (comp first position :body)
+                    mid-x (mean (map (comp first position)
                                      (vals components)))
-                    top (apply max (map (comp second position :body)
+                    top (apply max (map (comp second position)
                                         (vals components)))
                     [labx laby] (->px [mid-x (+ top 1)])]]
         (quil/text-align :center :top)
@@ -40,9 +40,8 @@
         (when (= 0 (:show-details-level game 0))
           (quil/text-align :center :top)
           (quil/stroke (quil/color 255 0 0))
-          (doseq [[cmp-key cmp] components
-                  :let [body (:body cmp)]]
-            (doseq [pt (:pois cmp)
+          (doseq [[cmp-key body] components]
+            (doseq [pt (:points-of-interest (user-data body))
                     :let [[x y] (->px (position body pt))]]
               (quil/ellipse x y 10 10))
             (quil/with-translation (->px (center body))

@@ -1,6 +1,6 @@
 # Hatto ハット"
 
-Very early stage - experiments only.
+Early stage - experiments only.
 
 Hatto is a programming game. That means you don't play the game
 directly. Instead you make a program to play it. Your program is the

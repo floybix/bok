@@ -4,17 +4,18 @@
 
 (defrecord Entity [entity-type components joints])
 
-;; TODO POIs are like metadata, should be stored in Body user-data
-(defrecord BodyPois [body pois])
-
 (defrecord PointState [point position velocity])
+
+(defn with-pois
+  [body pois]
+  (vary-user-data body #(assoc % :points-of-interest pois)))
 
 (defn entity-mass
   [entity]
   (->> entity
        :components
        vals
-       (map (comp mass :body))
+       (map mass)
        (reduce +)))
 
 (defn entity-angular-velocity
@@ -25,7 +26,6 @@
       (->> entity
            :components
            vals
-           (map :body)
            (reduce (fn [av body]
                      (+ av (* (angular-velocity body)
                               (/ (mass body) total-mass))))
@@ -39,11 +39,12 @@
 
 (defn observe-components
   [entity]
-  (reduce-kv (fn [m k {:keys [body pois]}]
-               (assoc m k
-                      {:angle (angle body)
-                       :points (for [poi pois]
-                                 (point-state body poi))}))
+  (reduce-kv (fn [m k body]
+               (let [pois (:points-of-interest (user-data body))]
+                 (assoc m k
+                        {:angle (angle body)
+                         :points (for [poi pois]
+                                   (point-state body poi))})))
              {}
              (:components entity)))
 
