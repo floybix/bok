@@ -51,10 +51,10 @@ Or try running players over the wire:
 
 ```
 cd hatto/players/clojure
-lein run -m org.nfrac.hatto.examples.legsoid1 5555 &
-lein run -m org.nfrac.hatto.examples.legsoid1 5556 &
+lein run -m org.nfrac.hatto.examples.legsoid1 5555
+lein run -m org.nfrac.hatto.examples.legsoid1 5556
 cd hatto/runner
-lein run -m org.nfrac.hatto.visual-runner tcp://localhost:5555 tcp://localhost:5556 sandbox
+lein run -m org.nfrac.hatto.visual-runner sumo tcp://localhost:5555 tcp://localhost:5556
 ```
 
 Or use the Clojure REPL: see

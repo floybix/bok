@@ -1,6 +1,5 @@
 (ns org.nfrac.hatto.visual-runner
-  (:require [org.nfrac.hatto.runner :as runner]
-            [org.nfrac.hatto.core :as core]
+  (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
             [cljbox2d.core :refer [position center angle]]
             [cljbox2d.joints :refer [body-a body-b anchor-a joint-angle]]
             [cljbox2d.vec2d :refer [v-dist]]
@@ -8,16 +7,6 @@
             [quil.core :as quil]
             [quil.middleware])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]))
-
-(defn step-remote
-  [game]
-  (if (:paused? game)
-    game
-    (if-let [res (core/final-result game)]
-      (do
-        (quil/exit)
-        (assoc game :final-result res))
-      (runner/step-remote game))))
 
 (defn mean
   [xs]
@@ -111,27 +100,48 @@
      :on-close (fn [state] (deliver p state)))
     @p))
 
+(defn step-remote
+  [game]
+  (if (:paused? game)
+    game
+    (if-let [res (runner/final-result game)]
+      (do
+        (quil/exit)
+        (assoc game :final-result res))
+      (runner/step-remote game))))
+
+(defn step-local
+  [game action-fns]
+  (if (:paused? game)
+    game
+    (if-let [res (runner/final-result game)]
+      (do
+        (quil/exit)
+        (assoc game :final-result res))
+      (let [world-step (:world-step game)]
+        (-> game
+            (world-step)
+            (runner/take-actions action-fns))))))
+
 (defn main
-  [^ZMQ$Context ctx addr-a addr-b arena-type]
-  (with-open [sock-a (.socket ctx ZMQ/REQ)
-              sock-b (.socket ctx ZMQ/REQ)]
-    (.connect sock-a addr-a)
-    (.connect sock-b addr-b)
-    (-> (runner/start-bout arena-type sock-a sock-b)
-        (assoc :gameover-secs Double/POSITIVE_INFINITY)
-        (run-with-display step-remote)
-        (runner/end-bout))))
+  [^ZMQ$Context ctx arena-type addrs opts]
+  (runner/with-all-connected ctx ZMQ/REQ addrs
+    (fn [socks]
+      (-> (runner/start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
+          (run-with-display step-remote)
+          (runner/end-bout)))))
 
 (defn -main
-  [addr-a addr-b & [arena-type more-args]]
+  [arena-type & addrs]
   (let [ctx (ZMQ/context 1)
-        arena-type (keyword (or arena-type "simple"))]
-    (println "connecting to" addr-a)
-    (println "connecting to" addr-b)
+        arena-type (keyword arena-type)]
+    (assert (pos? (count addrs)))
+    (println "connecting to" addrs)
     (try
-      (-> (main ctx addr-a addr-b arena-type)
+      (-> (main ctx arena-type addrs {})
           :final-result
           (println))
       (finally
         (println "closing ZMQ context")
         (.term ctx)))))
+

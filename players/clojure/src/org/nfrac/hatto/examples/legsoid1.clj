@@ -38,11 +38,11 @@
         b1-sp (* 4 dir)
         a2-sp (turn-towards DOWN a2-angle 40)
         b2-sp (turn-towards DOWN b2-angle 40)
-        actions {:limb-a1-rj a1-sp
-                 :limb-b1-rj b1-sp
-                 :limb-a2-rj a2-sp
-                 :limb-b2-rj b2-sp
-                 }]
+        actions {:joints {:limb-a1-rj a1-sp
+                          :limb-b1-rj b1-sp
+                          :limb-a2-rj a2-sp
+                          :limb-b2-rj b2-sp
+                          }}]
     (assoc state
       :actions actions)))
 

@@ -1,43 +1,35 @@
 (ns org.nfrac.hatto.tests.legsoid
-  (:require [org.nfrac.hatto.core :as core]
+  (:require [org.nfrac.hatto.games :as games]
             [org.nfrac.hatto.visual-runner :as visrun]
-            [cljbox2d.core :refer [step! mass]]
-            [quil.core :as quil]
+            [org.nfrac.hatto.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
 (defn a-action
   [info]
-  {:limb-a1-rj -10
-   :limb-b1-rj -2
-   :limb-a2-rj 5
-   :limb-b2-rj 2})
+  ;(pprint info)
+  {:joints {:limb-a1-rj -10
+            :limb-b1-rj -2
+            :limb-a2-rj 5
+            :limb-b2-rj 2}})
 
 (defn b-action
   [info]
-  {:limb-a1-rj 5
-   :limb-b1-rj 0
-   :limb-a2-rj -8})
-
-(defn step-local
-  [game]
-  (if (:paused? game)
-    game
-    (if-let [res (core/final-result game)]
-      (do
-        (quil/exit)
-        (assoc game :final-result res))
-      (-> game
-          (update-in [:world] step! (:dt-secs game))
-          (update-in [:time] + (:dt-secs game))
-          (core/take-actions a-action b-action)))))
+  {:joints {:limb-a1-rj 5
+            :limb-b1-rj 0
+            :limb-a2-rj -8}})
 
 (defn -main
   "Run the test sketch."
-  [& args]
-  (let [game (core/setup-game :simple :legsoid :legsoid)]
+  [& [arena-type]]
+  (let [arena-type (or (keyword arena-type) :sumo)
+        game (games/build arena-type
+                          {:player-a :legsoid
+                           :player-b :legsoid}
+                          {})]
     (println "legsoid mass:"
-             (-> game :entities :creature-a core/entity-mass))
+             (-> game :entities :player-a ent/entity-mass))
     (-> game
-        (visrun/run-with-display step-local)
+        (visrun/run-with-display #(visrun/step-local % {:player-a a-action
+                                                        :player-b b-action}))
         :final-result
         pprint)))
