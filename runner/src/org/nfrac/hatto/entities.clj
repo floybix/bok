@@ -1,6 +1,5 @@
 (ns org.nfrac.hatto.entities
-  (:require [cljbox2d.core :refer :all]
-            [cljbox2d.joints :refer :all]))
+  (:require [org.nfrac.cljbox2d.core :refer :all]))
 
 (defrecord Entity [entity-type components joints])
 
@@ -26,10 +25,10 @@
       (->> entity
            :components
            vals
-           (reduce (fn [av body]
-                     (+ av (* (angular-velocity body)
-                              (/ (mass body) total-mass))))
-                   0)))))
+           (map (fn [body]
+                  (* (angular-velocity body)
+                     (/ (mass body) total-mass))))
+           (reduce +)))))
 
 (defn point-state
   [body poi]

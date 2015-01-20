@@ -1,6 +1,5 @@
 (ns org.nfrac.hatto.runner
   (:require [org.nfrac.hatto.games :as games]
-            [cljbox2d.core :refer [step!]]
             [cognitect.transit :as transit])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))

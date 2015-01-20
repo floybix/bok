@@ -1,13 +1,14 @@
 (ns org.nfrac.hatto.games
   (:require [org.nfrac.hatto.entities :as ent :refer [with-pois map->Entity]]
             [org.nfrac.hatto.creatures :as creatures]
-            [cljbox2d.core :refer :all]))
+            [org.nfrac.cljbox2d.core :refer :all]))
 
 ;; =============================================================================
 
 (defrecord Game
     [game-type
      game-attributes
+     game-version
      world
      entities
      player-keys

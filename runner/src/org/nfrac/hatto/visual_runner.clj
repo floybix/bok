@@ -1,8 +1,8 @@
 (ns org.nfrac.hatto.visual-runner
   (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
-            [cljbox2d.core :refer [position center angle user-data]]
-            [cljbox2d.joints :refer [body-a body-b anchor-a joint-angle]]
-            [cljbox2d.vec2d :refer [v-dist]]
+            [org.nfrac.cljbox2d.core :refer [position center angle user-data
+                                             body-a body-b anchor-a]]
+            [org.nfrac.cljbox2d.vec2d :refer [v-dist]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
             [quil.middleware])

@@ -1,8 +1,7 @@
 (ns org.nfrac.hatto.creatures
   (:require [org.nfrac.hatto.entities :refer [with-pois map->Entity]]
-            [cljbox2d.core :refer :all]
-            [cljbox2d.joints :refer :all]
-            [cljbox2d.vec2d :refer [v-add]]))
+            [org.nfrac.cljbox2d.core :refer :all]
+            [org.nfrac.cljbox2d.vec2d :refer [v-add]]))
 
 (defmulti build
   (fn [type world _ _]

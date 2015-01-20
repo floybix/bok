@@ -18,27 +18,11 @@ See:
 [How to play](https://github.com/floybix/hatto/wiki/How-to-play)
 
 
-
-## Installation
+## Running bouts
 
 Get [Leiningen](http://leiningen.org/) first.
 
-Clone [cljbox2d](http://github.com/floybix/cljbox2d/),
-and install it to your local Maven repository (~/.m2):
-
-```
-cd cljbox2d
-lein install
-```
-
-also the cljbox2d testbed project:
-
-```
-cd cljbox2d/testbed
-lein install
-```
-
-Then you can run basic in-process demos:
+You can run basic in-process demos:
 
 ```
 cd hatto/runner
@@ -47,7 +31,7 @@ lein run -m org.nfrac.hatto.tests.humanoid
 lein run -m org.nfrac.hatto.tests.wormoid
 ```
 
-Or try running players over the wire:
+Or try running player servers communicating over TCP:
 
 ```
 cd hatto/players/clojure
