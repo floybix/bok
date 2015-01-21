@@ -219,7 +219,7 @@
                                :position [0 0]
                                :user-data {:org.nfrac.cljbox2d.testbed/rgb [255 0 0]}}
                         {:shape (circle 1.0)})
-                 [0 0])
+                 [[0 0]])
         arena (map->Entity
                {:entity-type :arena
                 :arena-type type
@@ -316,18 +316,20 @@
         ceiling (body! world {:type :static}
                        {:shape (edge [-16 ceil-y]
                                      [16 ceil-y])})
+        stal-depth 6
         stal-yend 10
         stal-xoff 1
         stal-pois (for [sign [-1 1]
                         frac (range 0.1 0.9 0.2)]
-                    (v-interp [0 stal-yend]
-                              [(* sign stal-xoff) ceil-y]
+                    (v-interp [0 (- stal-depth)]
+                              [(* sign stal-xoff) 0]
                               frac))
         stalactite (with-pois
-                     (apply body! world {:type :static}
-                            {:shape (polygon [[stal-xoff ceil-y]
-                                              [(- stal-xoff) ceil-y]
-                                              [0 stal-yend]])
+                     (apply body! world {:type :static
+                                         :position [0 ceil-y]}
+                            {:shape (polygon [[stal-xoff 0]
+                                              [(- stal-xoff) 0]
+                                              [0 (- stal-depth)]])
                              :friction 1}
                             (for [pos stal-pois
                                   :let [sign (if (neg? (first pos)) -1 1)]]
@@ -363,10 +365,10 @@
         mini-fx {:shape (box 0.5 0.5)
                  :density 2
                  :friction 1}
-        mini-pois [[-1 1]
-                   [1 1]
-                   [1 -1]
-                   [-1 -1]]
+        mini-pois [[-0.5 0.5]
+                   [0.5 0.5]
+                   [0.5 -0.5]
+                   [-0.5 -0.5]]
         minis (for [[sign s] [[-1 "left"] [1 "right"]]]
                 [(keyword (str "mini-" s))
                  (with-pois
@@ -387,7 +389,8 @@
                {:entity-type :arena
                 :arena-type type
                 :components (into {:ground ground
-                                   :stalactite stalactite}
+                                   :stalactite stalactite
+                                   :swing swing}
                                   (concat blocks minis plats))})
         starting-pts (map vector [-10 10] (repeat 2.5))]
     (->
@@ -398,4 +401,66 @@
        :camera {:width 40 :height 20 :x-left -20 :y-bottom -3}
        :check-end (fn [game]
                     (check-highest game 60)))
+     (add-players players starting-pts))))
+
+(defmethod build* :hunt
+  [type players _]
+  (let [world (new-world)
+        fence-pois [[-12 -6]
+                    [-12 6]
+                    [12 6]
+                    [12 -6]]
+        fence (with-pois
+                (apply body! world {:type :static
+                                    :position [0 6]}
+                       (edge-loop fence-pois
+                                  {:friction 1}))
+                fence-pois)
+        ;; -4m to left, 4.1m to right
+        pedestal-pts [[-4.0 0.0] [-2.5 0.2] [-2.0 0.5] [-2.1 1.1] [-1.9 1.8] [-1.5 2.0]
+                      [4.0 2.3] [4.1 2.1] [3.5 1.7] [3.0 1.0] [3.1 0.7] [3.25 0.0]]
+        pedestal (with-pois
+                   (apply body! world {:type :static
+                                       :position [0 0]}
+                          (edge-chain pedestal-pts
+                                      {:friction 1}))
+                   pedestal-pts)
+        ;; 3m to left, 3m to right
+        r-ramp-pts (into [[-3.0 0.0] [-1.0 1.5] [0.0 2.0]]
+                         ;; steps
+                         (reductions v-add
+                                 [0.5 2.0]
+                                 (interleave (repeat 5 [0.0 0.5])
+                                             (repeat 5 [0.5 0.0]))))
+        r-ramp (with-pois
+                 (apply body! world {:type :static
+                                     :position [(- 12 3) 0]}
+                        (edge-chain r-ramp-pts
+                                    {:friction 1}))
+                 r-ramp-pts)
+        ;; 1m to left, 1.5m to right
+        l-ramp-pts [[-1.0 1.2] [0.5 0.3] [1.5 0.0]]
+        l-ramp (with-pois
+                 (apply body! world {:type :static
+                                     :position [(+ -12 1) 0]}
+                        (edge-chain l-ramp-pts
+                                    {:friction 1}))
+                 l-ramp-pts)
+        arena (map->Entity
+               {:entity-type :arena
+                :arena-type type
+                :components (into {:fence fence
+                                   :pedestal pedestal
+                                   :r-ramp r-ramp
+                                   :l-ramp l-ramp}
+                                  ())})
+        starting-pts [[-10 8] [10 8]]]
+    (->
+     (assoc empty-game
+       :world world
+       :entities {:arena arena
+                  }
+       :camera {:width 30 :height 15 :x-left -15 :y-bottom -1}
+       :check-end (fn [game]
+                    nil))
      (add-players players starting-pts))))

@@ -27,7 +27,7 @@
                       "Press space to pause. Press q to quit.\n"
                       "Press d to switch display detail.")
                  10 10)
-      (doseq [[ent-key ent] (dissoc (:entities game) :arena)
+      (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
                     mid-x (mean (map (comp first position)
                                      (vals components)))
