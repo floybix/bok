@@ -112,14 +112,40 @@
         (update-in [:entities] into (zipmap (keys players) es))
         (update-in [:player-keys] into (keys players)))))
 
+(defn set-player-vels
+  [game player-keys vels]
+  (doseq [[k vel] (zipmap player-keys vels)
+          body (vals (get-in game [:entities k :components]))]
+    (linear-velocity! body vel))
+  game)
+
+(defn edge-chain
+  [vertices attrs]
+  (for [[v0 v1] (partition 2 1 vertices)]
+    (merge {:shape (edge v0 v1)} attrs)))
+
+(defn edge-loop
+  [vertices attrs]
+  (edge-chain (concat vertices (take 1 vertices))
+              attrs))
+
 ;; =============================================================================
 
-(defmulti build
-  "Returns a Game record."
+(defmulti build*
   (fn [type players opts]
     type))
 
-(defmethod build :sandbox
+(defn build
+  "Returns a Game record where all Body objects have their entity key
+   in user-data ::entity."
+  [type players opts]
+  (let [game (build* type players opts)]
+    (doseq [[ent-k ent] (:entities game)
+            [cmp-k cmp] (:components ent)]
+      (vary-user-data cmp #(assoc % ::entity ent-k)))
+    game))
+
+(defmethod build* :sandbox
   [type players _]
   (let [world (new-world)
         ground (body! world {:type :static}
@@ -139,7 +165,7 @@
           :camera {:width 40 :height 20 :x-left -20 :y-bottom -5})
         (add-players players starting-pts))))
 
-(defmethod build :sumo
+(defmethod build* :sumo
   [type players _]
   (let [world (new-world)
         ground (body! world {:type :static}
@@ -161,12 +187,123 @@
                         (check-fallen-down game -2))))
      (add-players players starting-pts))))
 
-(defn edge-chain
-  [vertices attrs]
-  (for [[v0 v1] (partition 2 1 vertices)]
-    (merge {:shape (edge v0 v1)} attrs)))
+(defmethod build* :vortex-maze
+  [type players _]
+  (let [world (new-world [0 0])
+        fence-pois [[-12 -10]
+                    [-12 10]
+                    [12 10]
+                    [12 -10]]
+        fence (with-pois
+                (apply body! world {:type :static}
+                       (edge-loop fence-pois
+                                  {:friction 1}))
+                fence-pois)
+        wall-fx {:shape (box 3 0.2)
+                 :friction 1}
+        wall-pois [[-3 0] [3 0]]
+        walls (for [i (range 4)
+                    :let [k (keyword (str "wall-" i))
+                          pos (get [[5 -5]
+                                    [-5 -5]
+                                    [-5 5]
+                                    [5 5]] i)]]
+                [k (with-pois
+                     (body! world {:type :static
+                                   :position pos
+                                   :angle (* Math/PI (/ i 2))}
+                            wall-fx)
+                     wall-pois)])
+        vortex (with-pois
+                 (body! world {:type :static
+                               :position [0 0]
+                               :user-data {:org.nfrac.cljbox2d.testbed/rgb [255 0 0]}}
+                        {:shape (circle 1.0)})
+                 [0 0])
+        arena (map->Entity
+               {:entity-type :arena
+                :arena-type type
+                :components (into {:fence fence
+                                   :vortex vortex}
+                                  walls)})
+        starting-pts [[-8 0] [8 0]]
+        starting-vels [[-3 -3] [3 3]]]
+    (->
+     (assoc empty-game
+       :world world
+       :entities {:arena arena}
+       :camera {:width 32 :height 24 :x-left -16 :y-bottom -12}
+       :check-end (fn [game]
+                    (let [dead (distinct (map (comp ::entity user-data)
+                                              (contacting vortex)))]
+                      (when (seq dead)
+                        {:winner (first (apply disj (:player-keys game) dead))}))))
+     (add-players players starting-pts)
+     (set-player-vels (keys players) starting-vels))))
 
-(defmethod build :energy-race
+(defmethod build* :energy-race
+  [type players _]
+  (let [world (new-world)
+        surface (for [x (range -20 20.01 0.2)]
+                  [x (+ (/ (Math/pow x 4)
+                           (Math/pow 20 3))
+                        (* (Math/cos (* x 4))
+                           (/ (* x x) (* 20 20))
+                           1.5))])
+        pois (for [z [0 1/3 2/3 1]]
+               (nth surface (* z (dec (count surface)))))
+        ground (apply body! world {:type :static}
+                      (edge-chain surface
+                                  {:friction 1}))
+        plat-fx {:shape (edge [-5 0] [5 0])
+                 :friction 1}
+        plat-pois [[-5 0] [5 0]]
+        plat-right (body! world {:type :static
+                                 :position [8 15]}
+                          plat-fx)
+        plat-left (body! world {:type :static
+                                :position [-8 15]}
+                         plat-fx)
+        arena (map->Entity
+               {:entity-type :arena
+                :arena-type type
+                :components {:ground (with-pois ground pois)
+                             :plat-left (with-pois plat-left plat-pois)
+                             :plat-right (with-pois plat-right plat-pois)}})
+        ;; place food by scanning down from above at regular intervals
+        food-pos (for [sign [-1 1]
+                       xa (concat [2 4 6]
+                                  (range 10.5 20))
+                       :let [x (* sign xa)]]
+                   (let [[rc] (raycast world [x 20] [x -10] :closest)]
+                     (if rc
+                       (v-add (:point rc) [0 0.2])
+                       (do (println (str "raycast missed: " x))
+                           [0 0]))))
+        food-fx {:shape (polygon [[0 0.5] [-0.25 0] [0.25 0]])
+                 :density 5 :restitution 0 :friction 1}
+        food (map->Entity
+              {:entity-type :food
+               :components (into {}
+                                 (map-indexed (fn [i pos]
+                                                (let [k (keyword (str "food-" i))]
+                                                  [k(with-pois
+                                                      (body! world {:position pos}
+                                                             food-fx)
+                                                      [[0 0]])]))
+                                              food-pos))})
+        starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
+    (->
+     (assoc empty-game
+       :world world
+       :entities {:arena arena
+                  :food food}
+       :camera {:width 40 :height 20 :x-left -20 :y-bottom -1}
+       :check-end (fn [game]
+                    (check-highest game 60)))
+     (add-players players starting-pts))))
+
+(defmethod build* :altitude
   [type players _]
   (let [world (new-world)
         surface (for [x (range -20 20.01 0.2)]
