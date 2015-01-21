@@ -1,7 +1,8 @@
 (ns org.nfrac.hatto.games
   (:require [org.nfrac.hatto.entities :as ent :refer [with-pois map->Entity]]
             [org.nfrac.hatto.creatures :as creatures]
-            [org.nfrac.cljbox2d.core :refer :all]))
+            [org.nfrac.cljbox2d.core :refer :all]
+            [org.nfrac.cljbox2d.vec2d :refer [v-add polar-xy]]))
 
 ;; =============================================================================
 
@@ -66,6 +67,20 @@
                      (:player-keys game))]
     (when (seq dead)
       {:winner (first (apply disj (:player-keys game) dead))})))
+
+(defn check-highest
+  [game limit-secs]
+  (when (> (:time game) limit-secs)
+    (let [heights (into {}
+                        (map (fn [player-key]
+                               (let [player (get-in game [:entities player-key])
+                                     head (-> player :components :head)
+                                     [x y] (position head)]
+                                 [player-key y]))
+                             (:player-keys game)))
+          highest (apply max-key heights (:player-keys game))]
+      {:winner highest
+       :heights heights})))
 
 ;; =============================================================================
 
@@ -144,4 +159,71 @@
        :check-end (fn [game]
                     (or (check-time-limit game 60)
                         (check-fallen-down game -2))))
+     (add-players players starting-pts))))
+
+(defn edge-chain
+  [vertices attrs]
+  (for [[v0 v1] (partition 2 1 vertices)]
+    (merge {:shape (edge v0 v1)} attrs)))
+
+(defmethod build :energy-race
+  [type players _]
+  (let [world (new-world)
+        surface (for [x (range -20 20.01 0.2)]
+                  [x (+ (/ (Math/pow x 4)
+                           (Math/pow 20 3))
+                        (* (Math/cos (* x 4))
+                           (/ (* x x) (* 20 20))
+                           1.5))])
+        pois (for [z [0 1/3 2/3 1]]
+               (nth surface (* z (dec (count surface)))))
+        ground (apply body! world {:type :static}
+                      (edge-chain surface
+                                  {:friction 1}))
+        plat-fx {:shape (edge [-5 0] [5 0])
+                 :friction 1}
+        plat-pois [[-5 0] [5 0]]
+        plat-right (body! world {:type :static
+                                 :position [8 15]}
+                          plat-fx)
+        plat-left (body! world {:type :static
+                                :position [-8 15]}
+                         plat-fx)
+        arena (map->Entity
+               {:entity-type :arena
+                :arena-type type
+                :components {:ground (with-pois ground pois)
+                             :plat-left (with-pois plat-left plat-pois)
+                             :plat-right (with-pois plat-right plat-pois)}})
+        ;; place food by scanning down from above at regular intervals
+        food-pos (for [sign [-1 1]
+                       xa (concat [2 4 6]
+                                  (range 10.5 20))
+                       :let [x (* sign xa)]]
+                   (let [[rc] (raycast world [x 20] [x -10] :closest)]
+                     (if rc
+                       (v-add (:point rc) [0 0.2])
+                       (do (println (str "raycast missed: " x))
+                           [0 0]))))
+        food-fx {:shape (polygon [[0 0.5] [-0.25 0] [0.25 0]])
+                 :density 5 :restitution 0 :friction 1}
+        food (map->Entity
+              {:entity-type :food
+               :components (into {}
+                                 (map-indexed (fn [i pos]
+                                                (let [k (keyword (str "food-" i))]
+                                                  [k(with-pois
+                                                      (body! world {:position pos}
+                                                             food-fx)
+                                                      [[0 0]])]))
+                                              food-pos))})
+        starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
+    (->
+     (assoc empty-game
+       :world world
+       :entities {:arena arena
+                  :food food}
+       :camera {:width 40 :height 20 :x-left -20 :y-bottom -1}
+       :check-end (fn [game]
+                    (check-highest game 60)))
      (add-players players starting-pts))))
