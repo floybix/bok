@@ -64,12 +64,13 @@
 
 (defmethod build :humanoid
   [type world position group-index]
-  (let [head (body! world {:position position}
+  (let [head-pos (v-add position [0 0.75])
+        head (body! world {:position head-pos}
                     {:shape (circle 0.25)
                      :density 5
                      :friction 0.5
                      :group-index group-index})
-        torso-pos (v-add position [0.0 -0.75])
+        torso-pos position
         torso-pts [[0.00 0.50]
                    [-0.25 0.25]
                    [-0.25 -0.25]
@@ -84,7 +85,7 @@
                       :friction 0.5
                       :group-index group-index})
         wj (joint! {:type :weld :body-a head :body-b torso
-                    :world-anchor position})
+                    :world-anchor head-pos})
         limb-spec {:density 10
                    :friction 0.5
                    :group-index group-index}
@@ -110,7 +111,8 @@
 
 (defmethod build :wormoid
   [type world position group-index]
-  (let [head (body! world {:position position}
+  (let [head-pos (v-add position [-3 0])
+        head (body! world {:position head-pos}
                     {:shape (circle 0.25)
                      :density 5
                      :friction 0.5
@@ -118,7 +120,7 @@
         limb-spec {:density 10
                    :friction 0.5
                    :group-index group-index}
-        segs (limb world head position 1.0 limb-spec
+        segs (limb world head head-pos 1.0 limb-spec
                    :n-segments 6 :prefix "seg-")]
     (map->Entity
      {:entity-type :creature
