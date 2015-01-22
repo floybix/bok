@@ -51,26 +51,25 @@
       (update-in [:world] step! (:dt-secs game))
       (update-in [:time] + (:dt-secs game))))
 
-(defn check-time-limit
-  [game limit-secs]
-  (when (> (:time game) limit-secs)
-    {:winner nil}))
+(def Inf Double/POSITIVE_INFINITY)
 
 (defn check-fallen-down
   [game y-val]
-  (let [dead (filter (fn [player-key]
-                       (let [player (get-in game [:entities player-key])
-                             head (-> player :components :head)
-                             [x y] (position head)]
-                         ;; head has fallen below death level
-                         (< y y-val)))
-                     (:player-keys game))]
-    (when (seq dead)
-      {:winner (first (apply disj (:player-keys game) dead))})))
+  (when (> (:time game) (:game-over-secs game Inf))
+    {:winner nil}
+    (let [dead (filter (fn [player-key]
+                         (let [player (get-in game [:entities player-key])
+                               head (-> player :components :head)
+                               [x y] (position head)]
+                           ;; head has fallen below death level
+                           (< y y-val)))
+                       (:player-keys game))]
+      (when (seq dead)
+        {:winner (first (apply disj (:player-keys game) dead))}))))
 
 (defn check-highest
-  [game limit-secs]
-  (when (> (:time game) limit-secs)
+  [game]
+  (when (> (:time game) (:game-over-secs game Inf))
     (let [heights (into {}
                         (map (fn [player-key]
                                (let [player (get-in game [:entities player-key])
@@ -81,6 +80,13 @@
           highest (apply max-key heights (:player-keys game))]
       {:winner highest
        :heights heights})))
+
+(defn check-max-energy
+  [game]
+  (when (> (:time game) (:game-over-secs game Inf))
+    (let [[winner energy] (apply max-key val (:player-energy game))]
+      {:winner winner
+       :energies (:player-energy game)})))
 
 ;; =============================================================================
 
@@ -137,12 +143,12 @@
 
 (defn build
   "Returns a Game record where all Body objects have their entity key
-   in user-data ::entity."
+   in user-data ::entity and component key in ::component."
   [type players opts]
   (let [game (build* type players opts)]
     (doseq [[ent-k ent] (:entities game)
             [cmp-k cmp] (:components ent)]
-      (vary-user-data cmp #(assoc % ::entity ent-k)))
+      (vary-user-data cmp #(assoc % ::entity ent-k ::component cmp-k)))
     game))
 
 (defmethod build* :sandbox
@@ -182,9 +188,9 @@
        :world world
        :entities {:arena arena}
        :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
+       :game-over-secs 60.0
        :check-end (fn [game]
-                    (or (check-time-limit game 60)
-                        (check-fallen-down game -2))))
+                    (check-fallen-down game -2)))
      (add-players players starting-pts))))
 
 (defmethod build* :vortex-maze
@@ -295,14 +301,16 @@
                  :density 5 :restitution 0 :friction 1}
         food (map->Entity
               {:entity-type :food
-               :components (into {}
-                                 (map-indexed (fn [i pos]
-                                                (let [k (keyword (str "food-" i))]
-                                                  [k(with-pois
-                                                      (body! world {:position pos}
-                                                             food-fx)
-                                                      [[0 0]])]))
-                                              food-pos))})
+               :components
+               (into {}
+                     (map-indexed (fn [i pos]
+                                    (let [k (keyword (str "food-" i))]
+                                      [k (with-pois
+                                           (body! world {:position pos
+                                                         :user-data {:joules 200.0}}
+                                                  food-fx)
+                                           [[0 0]])]))
+                                  food-pos))})
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (->
      (assoc empty-game
@@ -310,8 +318,37 @@
        :entities {:arena arena
                   :food food}
        :camera {:width 40 :height 20 :x-left -20 :y-bottom -1}
+       :player-energy (zipmap (keys players) (repeat 300.0))
+       :game-over-secs 60.0
+       :world-step
+       (fn [game]
+         (-> (reduce (fn [game player-key]
+                       (let [me (get-in game [:entities player-key])
+                             e-loss (ent/entity-work-joules me (:dt-secs game))
+                             head (get-in me [:components :head])
+                             snack (first (filter (comp #(= % :food) ::entity user-data)
+                                                  (contacting head)))
+                             snack-k (when snack (::component (user-data snack)))
+                             e-gain (if snack (:joules (user-data snack)) 0)
+                             energy (+ (get-in game [:player-energy player-key])
+                                       (- e-gain e-loss))]
+                         (vary-user-data head #(assoc % :org.nfrac.cljbox2d.testbed/rgb
+                                                      [(-> energy (/ 2) (max 128) (min 255))
+                                                       (-> energy (/ 1) (max 0) (min 255))
+                                                       (- (-> energy (/ 2) (max 128) (min 255))
+                                                          128)]))
+                         (when snack
+                           (destroy! snack))
+                         (-> (if snack
+                               (update-in game [:entities :food :components]
+                                          dissoc snack-k)
+                               game)
+                             (update-in [:player-energy] assoc player-key energy))))
+                     game
+                     (:player-keys game))
+             (world-step)))
        :check-end (fn [game]
-                    (check-highest game 60)))
+                    (check-max-energy game)))
      (add-players players starting-pts))))
 
 (defmethod build* :altitude
@@ -410,8 +447,9 @@
        :entities {:arena arena
                   }
        :camera {:width 40 :height 20 :x-left -20 :y-bottom -3}
+       :game-over-secs 60.0
        :check-end (fn [game]
-                    (check-highest game 60)))
+                    (check-highest game)))
      (add-players players starting-pts))))
 
 (defmethod build* :hunt

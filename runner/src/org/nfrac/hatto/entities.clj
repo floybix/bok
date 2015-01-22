@@ -30,6 +30,15 @@
                      (/ (mass body) total-mass))))
            (reduce +)))))
 
+(defn entity-work-joules
+  [entity dt]
+  (->> entity
+       :joints
+       vals
+       (map power-watts)
+       (reduce +)
+       (* dt)))
+
 (defn point-state
   [body poi]
   (->PointState poi
