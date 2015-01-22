@@ -2,7 +2,7 @@
   (:require [org.nfrac.hatto.entities :as ent :refer [with-pois map->Entity]]
             [org.nfrac.hatto.creatures :as creatures]
             [org.nfrac.cljbox2d.core :refer :all]
-            [org.nfrac.cljbox2d.vec2d :refer [v-add polar-xy v-interp]]))
+            [org.nfrac.cljbox2d.vec2d :refer [v-add v-sub polar-xy v-interp v-scale]]))
 
 ;; =============================================================================
 
@@ -233,6 +233,16 @@
        :world world
        :entities {:arena arena}
        :camera {:width 32 :height 24 :x-left -16 :y-bottom -12}
+       :world-step (fn [game]
+                     (let [vort-pos (position vortex)]
+                       (doseq [k (:player-keys game)
+                               body (vals (get-in game [:entities k :components]))
+                               :let [pos (center body)
+                                     force (-> (v-sub vort-pos pos)
+                                               (v-scale)
+                                               (v-scale 0.5))]]
+                         (apply-force! body force (loc-center body))))
+                     (world-step game))
        :check-end (fn [game]
                     (let [dead (distinct (map (comp ::entity user-data)
                                               (contacting vortex)))]
