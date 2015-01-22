@@ -255,9 +255,10 @@
   [type players _]
   (let [world (new-world)
         surface (for [x (range -20 20.01 0.2)]
-                  [x (+ (/ (Math/pow x 4)
-                           (Math/pow 20 3))
-                        (* (Math/cos (* x 4))
+                  [x (+ (* (Math/pow x 4)
+                           (/ (Math/pow 20 4))
+                           20.0)
+                        (* (Math/cos (* x 5))
                            (/ (* x x) (* 20 20))
                            1.5))])
         pois (for [z [0 1/3 2/3 1]]
@@ -265,14 +266,14 @@
         ground (apply body! world {:type :static}
                       (edge-chain surface
                                   {:friction 1}))
-        plat-fx {:shape (edge [-5 0] [5 0])
+        plat-fx {:shape (edge [-5.5 0] [5.5 0])
                  :friction 1}
-        plat-pois [[-5 0] [5 0]]
+        plat-pois [[-5.5 0] [5.5 0]]
         plat-right (body! world {:type :static
-                                 :position [8 15]}
+                                 :position [8 14]}
                           plat-fx)
         plat-left (body! world {:type :static
-                                :position [-8 15]}
+                                :position [-8 14]}
                          plat-fx)
         arena (map->Entity
                {:entity-type :arena
@@ -283,7 +284,7 @@
         ;; place food by scanning down from above at regular intervals
         food-pos (for [sign [-1 1]
                        xa (concat [2 4 6]
-                                  (range 10.5 20))
+                                  (range 10.4 20))
                        :let [x (* sign xa)]]
                    (let [[rc] (raycast world [x 20] [x -10] :closest)]
                      (if rc
