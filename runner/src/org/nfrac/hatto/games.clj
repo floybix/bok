@@ -416,53 +416,114 @@
 (defmethod build* :hunt
   [type players _]
   (let [world (new-world)
-        fence-pois [[-12 -6]
-                    [-12 6]
-                    [12 6]
-                    [12 -6]]
+        fence-pois [[-15 -7]
+                    [-15 7]
+                    [15 7]
+                    [15 -7]]
         fence (with-pois
                 (apply body! world {:type :static
-                                    :position [0 6]}
+                                    :position [0 7]}
                        (edge-loop fence-pois
                                   {:friction 1}))
                 fence-pois)
-        ;; -4m to left, 4.1m to right
+        ;; -4m to left, 4.1m to right, 2.3m up
         pedestal-pts [[-4.0 0.0] [-2.5 0.2] [-2.0 0.5] [-2.1 1.1] [-1.9 1.8] [-1.5 2.0]
                       [4.0 2.3] [4.1 2.1] [3.5 1.7] [3.0 1.0] [3.1 0.7] [3.25 0.0]]
         pedestal (with-pois
                    (apply body! world {:type :static
-                                       :position [0 0]}
+                                       :position [2 0]}
                           (edge-chain pedestal-pts
                                       {:friction 1}))
                    pedestal-pts)
-        ;; 3m to left, 3m to right
-        r-ramp-pts (into [[-3.0 0.0] [-1.0 1.5] [0.0 2.0]]
-                         ;; steps
+        ;; 3m to left, 3.5m to right
+        r-ramp-pts (into [[-3.0 0.0] [-2.0 1.0] [-1 0.9] [0.0 0.5]]
+                         ;; steps continue ramp
                          (reductions v-add
-                                 [0.5 2.0]
-                                 (interleave (repeat 5 [0.0 0.5])
-                                             (repeat 5 [0.5 0.0]))))
+                                     [0.0 1.0]
+                                     (interpose [0.0 0.5]
+                                                (repeat 7 [0.5 0.0]))))
         r-ramp (with-pois
                  (apply body! world {:type :static
-                                     :position [(- 12 3) 0]}
+                                     :position [(- 15 3.5) 0]}
                         (edge-chain r-ramp-pts
                                     {:friction 1}))
                  r-ramp-pts)
+        ;; 3m to left, 3m to right. 1.5m down, 1m up
+        steps-pts (reductions v-add
+                              [3 -1.5]
+                              (interpose [0.0 0.5]
+                                         (repeat 6 [-1.0 0.0])))
+        steps (with-pois
+                (apply body! world {:type :static
+                                    :position [(- 15 7) 7]}
+                       (edge-chain steps-pts
+                                   {:friction 1}))
+                steps-pts)
         ;; 1m to left, 1.5m to right
         l-ramp-pts [[-1.0 1.2] [0.5 0.3] [1.5 0.0]]
         l-ramp (with-pois
                  (apply body! world {:type :static
-                                     :position [(+ -12 1) 0]}
+                                     :position [(+ -15 1) 0]}
                         (edge-chain l-ramp-pts
                                     {:friction 1}))
                  l-ramp-pts)
+        ;; 7m to left, 7m to right. 3m down, 2m up
+        slope-pts [[-7 -3] [-6 -3] [-5 -2.5] [-4.2 -2.6] [-3 -2] [-2 -1.8]
+                   [-1.6 -1.1] [-0.5 -0.9] [0 -1] [1 -0.7] [1.5 0.1] [2 0]
+                   [2.1 0.5] [3 1] [5 1] [5.5 1.2] [6 2] [7 2]]
+        slope (with-pois
+                (apply body! world {:type :static
+                                    :position [-5 6]}
+                       (edge-chain slope-pts
+                                   {:friction 1}))
+                slope-pts)
+        ;; 3m to left, 3m to right
+        plat-fx {:shape (edge [-3 0] [3 0])
+                 :friction 1}
+        plat-pois [[-3 0] [3 0]]
+        plat (with-pois
+               (body! world {:type :static
+                             :position [(+ -15 6) 10]}
+                      plat-fx)
+               plat-pois)
+        ;; 5m up, 0.5m right
+        ladder-pois (for [y (range 0 5.01)]
+                      [0.5 y])
+        ladder (with-pois
+                 (apply body! world {:type :static
+                                     :position [-15 5]}
+                        (for [poi ladder-pois]
+                          {:shape (edge poi (v-add poi [-0.5 -0.1]))
+                           :friction 1}))
+                 ladder-pois)
+        ;; 1m down, 0.5m up
+        boulder-pois [[1.0 -0.4] [0.9 0.3] [0.1 0.5] [-0.6 0.4]
+                      [-0.9 -0.1] [-0.7 -0.8] [-0.2 -1.0] [0.6 -1.0]]
+        boulder-lo (with-pois
+                     (body! world {:position [3 3.5]}
+                            {:shape (polygon boulder-pois)
+                             :density 5
+                             :friction 1})
+                     boulder-pois)
+        boulder-hi (with-pois
+                     (body! world {:position [-1 8]}
+                            {:shape (polygon boulder-pois)
+                             :density 5
+                             :friction 1})
+                     boulder-pois)
         arena (map->Entity
                {:entity-type :arena
                 :arena-type type
                 :components (into {:fence fence
                                    :pedestal pedestal
                                    :r-ramp r-ramp
-                                   :l-ramp l-ramp}
+                                   :steps steps
+                                   :l-ramp l-ramp
+                                   :slope slope
+                                   :plat plat
+                                   :ladder ladder
+                                   :boulder-lo boulder-lo
+                                   :boulder-hi boulder-hi}
                                   ())})
         starting-pts [[-10 8] [10 8]]]
     (->
@@ -470,7 +531,7 @@
        :world world
        :entities {:arena arena
                   }
-       :camera {:width 30 :height 15 :x-left -15 :y-bottom -1}
+       :camera {:width 32 :height 16 :x-left -16 :y-bottom -1}
        :check-end (fn [game]
                     nil))
      (add-players players starting-pts))))
