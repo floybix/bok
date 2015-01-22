@@ -10,13 +10,16 @@
   {:joints {:limb-a1-rj -10
             :limb-b1-rj -2
             :limb-a2-rj 5
-            :limb-b2-rj 2}})
+            :limb-b2-rj 2}
+   :gun {:fire true}})
 
 (defn b-action
   [info]
   {:joints {:limb-a1-rj 5
             :limb-b1-rj 0
-            :limb-a2-rj -8}})
+            :limb-a2-rj -8}
+   :gun {:speed 1
+         :fire true}})
 
 (defn -main
   "Run the test sketch."

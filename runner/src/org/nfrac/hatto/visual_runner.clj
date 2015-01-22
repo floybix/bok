@@ -1,8 +1,9 @@
 (ns org.nfrac.hatto.visual-runner
   (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
             [org.nfrac.cljbox2d.core :refer [position center angle user-data
-                                             body-a body-b anchor-a]]
-            [org.nfrac.cljbox2d.vec2d :refer [v-dist]]
+                                             body-a body-b anchor-a radius
+                                             fixture-of]]
+            [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
             [quil.middleware])
@@ -18,6 +19,18 @@
   (bed/draw game)
   (let [cam (:camera game)
         ->px (partial bed/world-to-px cam)]
+    ;; guns
+    (doseq [[player-key gun-info] (:player-gun game)
+            :let [head (get-in game [:entities player-key :components :head])
+                  gun-length (* 2 (radius (fixture-of head)))
+                  gun-length-px (v-dist (->px [0 0])
+                                        (->px [gun-length 0]))]]
+      (quil/stroke (quil/color 200 200 200))
+      (quil/with-translation (->px (position head))
+        (quil/with-rotation [(- (:angle gun-info))]
+          (quil/line [0 2] [gun-length-px 2])
+          (quil/line [0 -2] [gun-length-px -2]))))
+    ;; details
     (quil/fill 255)
     (quil/text-align :left)
     (when-not (:show-details? game)

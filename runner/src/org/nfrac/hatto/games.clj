@@ -614,12 +614,53 @@
                              :boulder-lo boulder-lo
                              :boulder-hi boulder-hi}
                 })
-        starting-pts [[-10 8] [10 8]]]
+        starting-pts [[-10 8] [10 8]]
+        GUN_SPEED 1.0
+        GUN_AMMO 5
+        GUN_RELOAD 30]
     (->
      (assoc empty-game
        :world world
        :entities {:arena arena}
        :camera {:width 32 :height 16 :x-left -16 :y-bottom -1}
+       :player-gun (zipmap (keys players)
+                           (repeat {:angle 0.0
+                                    :ammo GUN_AMMO
+                                    :reload-countdown GUN_RELOAD}))
+       :perceive (fn [game player-key]
+                   (assoc (perceive game player-key)
+                     :guns (:player-gun game)))
+       :act (fn [game player-key actions]
+              ;; process usual actions first
+              (let [game (act-on-joints game player-key actions)
+                    gun-info (get-in game [:player-gun player-key])
+                    ang (:angle gun-info)]
+                (if (and (:fire (:gun actions))
+                         (zero? (:reload-countdown gun-info))
+                         (pos? (:ammo gun-info)))
+                  ;; fire gun
+                  (let [head (get-in game [:entities player-key :components :head])
+                        bullet (body! world {:position (v-add (position head)
+                                                              (polar-xy 0.5 ang))
+                                             :angle ang
+                                             :bullet true}
+                                      {:shape (box 0.1 0.05)
+                                       :density 20})
+                        impulse (polar-xy 100 ang)]
+                    (apply-impulse! bullet impulse (center bullet))
+                    (apply-impulse! head (v-scale impulse -1) (center head))
+                    (-> game
+                        (update-in [:player-gun player-key :ammo] dec)
+                        (assoc-in [:player-gun player-key :reload-countdown] GUN_RELOAD)))
+                  ;; otherwise, not firing gun
+                  (let [da (-> (:speed (:gun actions) 0)
+                               (min GUN_SPEED)
+                               (max (- GUN_SPEED))
+                               (* (:dt-act-secs game)))]
+                    (-> game
+                        (update-in [:player-gun player-key :angle] + da)
+                        (update-in [:player-gun player-key :reload-countdown]
+                                   #(max 0 (dec %))))))))
        :check-end (fn [game]
                     nil))
      (add-players players starting-pts))))
