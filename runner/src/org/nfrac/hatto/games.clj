@@ -22,6 +22,7 @@
      check-end])
 
 ;; =============================================================================
+;; ## default method implementations
 
 (defn perceive
   [game player-key]
@@ -35,10 +36,6 @@
      :my-key player-key
      :entities obs}))
 
-(defn act-now?
-  [{:keys [time dt-act-secs last-act-time]}]
-  (>= time (+ dt-act-secs last-act-time)))
-
 (defn act-on-joints
   [game player-key actions]
   (ent/set-joint-motors! (get-in game [:entities player-key])
@@ -50,6 +47,9 @@
   (-> game
       (update-in [:world] step! (:dt-secs game))
       (update-in [:time] + (:dt-secs game))))
+
+;; =============================================================================
+;; ## check-end functions
 
 (def Inf Double/POSITIVE_INFINITY)
 
@@ -103,6 +103,10 @@
     :world-step world-step
     :check-end (fn [game] nil)}))
 
+(defn act-now?
+  [{:keys [time dt-act-secs last-act-time]}]
+  (>= time (+ dt-act-secs last-act-time)))
+
 (defn add-players
   "Creates entities for each given player and adds them to the world
    and the game recor. `players` is a map from player keywords to a
@@ -151,6 +155,11 @@
       (vary-user-data cmp #(assoc % ::entity ent-k ::component cmp-k)))
     game))
 
+;; =============================================================================
+;; ## Sandbox.
+;;
+;; Just a flat ground and enclosing walls. For testing.
+
 (defmethod build* :sandbox
   [type players _]
   (let [world (new-world)
@@ -170,6 +179,12 @@
           :entities {:arena arena}
           :camera {:width 40 :height 20 :x-left -20 :y-bottom -5})
         (add-players players starting-pts))))
+
+;; =============================================================================
+;; ## Sumo
+;;
+;; Just a flat ground/platform, aim is to push opponent off. Times out
+;; after 60s.
 
 (defmethod build* :sumo
   [type players _]
@@ -192,6 +207,14 @@
        :check-end (fn [game]
                     (check-fallen-down game -2)))
      (add-players players starting-pts))))
+
+;; =============================================================================
+;; ## Vortex Maze
+;;
+;; Zero gravity. Aim is to push opponent into central vortex. There
+;; is a small suction force towards the vortex to avoid getting stuck
+;; floating in space. Has enclosing walls around, and four internal
+;; walls.
 
 (defmethod build* :vortex-maze
   [type players _]
@@ -256,6 +279,14 @@
                         {:winner (first (apply disj (:player-keys game) dead))}))))
      (add-players players starting-pts)
      (set-player-vels (keys players) starting-vels))))
+
+;; =============================================================================
+;; ## Energy Race
+;;
+;; Aim is to have more energy than opponent when the time limit is
+;; reached. Touch the scattered food particles with head to eat them
+;; and gain energy. Moving joints uses energy. Arena is a x^4 curve
+;; with a sine wave mixed in for foot-holds. Also two high platforms.
 
 (defmethod build* :energy-race
   [type players _]
@@ -350,6 +381,14 @@
        :check-end (fn [game]
                     (check-max-energy game)))
      (add-players players starting-pts))))
+
+;; =============================================================================
+;; ## Altitude
+;;
+;; Aim is to be at a higher (head) position than opponent when the
+;; time limit is reached. Arena has large and small blocks, two
+;; platforms, a central swing (on rope joints) and a stalactite with
+;; hand-holds.
 
 (defmethod build* :altitude
   [type players _]
@@ -452,6 +491,16 @@
                     (check-highest game)))
      (add-players players starting-pts))))
 
+;; =============================================================================
+;; ## Hunt
+;;
+;; Aim is to fire a bullet hitting your opponent. Each player has a
+;; gun attached to their head. It does not collide with things, but it
+;; has some angle at which it is pointed. There are special actions to
+;; rotate the gun and to fire the gun. There is a maximum speed at
+;; which the gun can be rotated, so it can take several time steps to
+;; aim it.
+
 (defmethod build* :hunt
   [type players _]
   (let [world (new-world)
@@ -545,7 +594,8 @@
                              :friction 1})
                      boulder-pois)
         boulder-hi (with-pois
-                     (body! world {:position [-1 8]}
+                     (body! world {:position [-1 8]
+                                   :angle Math/PI}
                             {:shape (polygon boulder-pois)
                              :density 5
                              :friction 1})
@@ -553,23 +603,22 @@
         arena (map->Entity
                {:entity-type :arena
                 :arena-type type
-                :components (into {:fence fence
-                                   :pedestal pedestal
-                                   :r-ramp r-ramp
-                                   :steps steps
-                                   :l-ramp l-ramp
-                                   :slope slope
-                                   :plat plat
-                                   :ladder ladder
-                                   :boulder-lo boulder-lo
-                                   :boulder-hi boulder-hi}
-                                  ())})
+                :components {:fence fence
+                             :pedestal pedestal
+                             :r-ramp r-ramp
+                             :steps steps
+                             :l-ramp l-ramp
+                             :slope slope
+                             :plat plat
+                             :ladder ladder
+                             :boulder-lo boulder-lo
+                             :boulder-hi boulder-hi}
+                })
         starting-pts [[-10 8] [10 8]]]
     (->
      (assoc empty-game
        :world world
-       :entities {:arena arena
-                  }
+       :entities {:arena arena}
        :camera {:width 32 :height 16 :x-left -16 :y-bottom -1}
        :check-end (fn [game]
                     nil))
