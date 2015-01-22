@@ -111,7 +111,7 @@
 
 (defmethod build :wormoid
   [type world position group-index]
-  (let [head-pos (v-add position [-3 0])
+  (let [head-pos (v-add position [-2.5 0])
         head (body! world {:position head-pos}
                     {:shape (circle 0.25)
                      :density 5
@@ -121,7 +121,7 @@
                    :friction 0.5
                    :group-index group-index}
         segs (limb world head head-pos 1.0 limb-spec
-                   :n-segments 6 :prefix "seg-")]
+                   :n-segments 5 :prefix "seg-")]
     (map->Entity
      {:entity-type :creature
       :creature-type type

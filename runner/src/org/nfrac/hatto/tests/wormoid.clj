@@ -8,7 +8,7 @@
   [info]
   {:joints {:seg-1-rj 8
             :seg-2-rj 0
-            :seg-6-rj 5}})
+            :seg-5-rj 5}})
 
 (defn b-action
   [info]
