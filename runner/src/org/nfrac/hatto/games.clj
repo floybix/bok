@@ -616,8 +616,9 @@
                 })
         starting-pts [[-10 8] [10 8]]
         GUN_SPEED 1.0
-        GUN_AMMO 5
-        GUN_RELOAD 30]
+        GUN_AMMO 50
+        GUN_RELOAD 2
+        contacts (set-buffering-contact-listener! world)]
     (->
      (assoc empty-game
        :world world
@@ -640,27 +641,48 @@
                          (pos? (:ammo gun-info)))
                   ;; fire gun
                   (let [head (get-in game [:entities player-key :components :head])
+                        group-index (get-in game [:entities player-key :group-index])
                         bullet (body! world {:position (v-add (position head)
                                                               (polar-xy 0.5 ang))
                                              :angle ang
                                              :bullet true}
-                                      {:shape (box 0.1 0.05)
-                                       :density 20})
-                        impulse (polar-xy 100 ang)]
+                                      {:shape (box 0.2 0.05)
+                                       :density 10
+                                       :group-index group-index
+                                       :user-data {::bullet-of player-key}})
+                        impulse (polar-xy 10 ang)]
                     (apply-impulse! bullet impulse (center bullet))
                     (apply-impulse! head (v-scale impulse -1) (center head))
                     (-> game
                         (update-in [:player-gun player-key :ammo] dec)
                         (assoc-in [:player-gun player-key :reload-countdown] GUN_RELOAD)))
                   ;; otherwise, not firing gun
-                  (let [da (-> (:speed (:gun actions) 0)
+                  (let [dt (:dt-act-secs game)
+                        da (-> (:speed (:gun actions) 0)
                                (min GUN_SPEED)
                                (max (- GUN_SPEED))
-                               (* (:dt-act-secs game)))]
+                               (* dt))]
                     (-> game
                         (update-in [:player-gun player-key :angle] + da)
                         (update-in [:player-gun player-key :reload-countdown]
-                                   #(max 0 (dec %))))))))
+                                   #(max 0 (- % dt))))))))
+       :world-step (fn [game]
+                     (world-step game))
        :check-end (fn [game]
-                    nil))
+                    (let [hits (keep (fn [{:keys [fixture-a fixture-b]}]
+                                       (cond
+                                        (::bullet-of (user-data fixture-a))
+                                        [fixture-a fixture-b]
+                                        (::bullet-of (user-data fixture-b))
+                                        [fixture-b fixture-a]))
+                                     @contacts)
+                          dead (set (keep (fn [[_ target-fixt]]
+                                            (get (:player-keys game)
+                                                 (::entity (user-data (body-of target-fixt)))))
+                                          hits))]
+                      (doseq [[bullet-fixt _] hits]
+                        (destroy! (body-of bullet-fixt)))
+                      (swap! contacts empty)
+                      (when (seq dead)
+                        {:winner (first (apply disj (:player-keys game) dead))}))))
      (add-players players starting-pts))))

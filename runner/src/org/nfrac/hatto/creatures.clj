@@ -58,6 +58,7 @@
     (map->Entity
      {:entity-type :creature
       :creature-type type
+      :group-index group-index
       :components (assoc (:components limbs)
                     :head (with-pois head [[0 0]]))
       :joints (:joints limbs)})))
@@ -104,6 +105,7 @@
     (map->Entity
      {:entity-type :creature
       :creature-type type
+      :group-index group-index
       :components (assoc (:components limbs)
                     :head (with-pois head [[0 0]])
                     :torso (with-pois torso torso-pois))
@@ -125,6 +127,7 @@
     (map->Entity
      {:entity-type :creature
       :creature-type type
+      :group-index group-index
       :components (assoc (:components segs)
                     :head (with-pois head [[0 0]]))
       :joints (:joints segs)})))

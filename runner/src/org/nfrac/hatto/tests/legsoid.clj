@@ -11,14 +11,15 @@
             :limb-b1-rj -2
             :limb-a2-rj 5
             :limb-b2-rj 2}
-   :gun {:fire true}})
+   :gun {:fire true
+         :speed 1}})
 
 (defn b-action
   [info]
   {:joints {:limb-a1-rj 5
             :limb-b1-rj 0
             :limb-a2-rj -8}
-   :gun {:speed 1
+   :gun {:speed 0.02
          :fire true}})
 
 (defn -main
