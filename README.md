@@ -2,16 +2,14 @@
 
 Early stage - experiments only.
 
-Hatto is a programming game. That means you don't play the game
-directly. Instead you make a program to play it. Your program is the
-player, and you tell it how to play.
-
-The game takes place in a 2D world (with physics and gravity). The aim
-is to push your opponent off the arena, or at least avoid falling off
-until your opponent falls first. It's like a wrestling match.
-
+Hatto are programming games. You don't play these games directly.
+Instead you write a program to control a creature. Your program is the
+player, and you tell it how to play. The games take place in a 2D
+world, with collisions and gravity and such like.
 
 See:
+
+[Games](https://github.com/floybix/hatto/wiki/Games)
 
 [Creatures](https://github.com/floybix/hatto/wiki/Creatures)
 
@@ -22,13 +20,15 @@ See:
 
 Get [Leiningen](http://leiningen.org/) first.
 
-You can run basic in-process demos:
+You can run some in-process demos:
 
 ```
 cd hatto/runner
-lein run -m org.nfrac.hatto.tests.legsoid
-lein run -m org.nfrac.hatto.tests.humanoid
-lein run -m org.nfrac.hatto.tests.wormoid
+lein run -m org.nfrac.hatto.tests.legsoid sumo
+lein run -m org.nfrac.hatto.tests.humanoid vortex-maze
+lein run -m org.nfrac.hatto.tests.wormoid altitude
+lein run -m org.nfrac.hatto.tests.legsoid energy-race
+lein run -m org.nfrac.hatto.tests.legsoid hunt
 ```
 
 Or try running player servers communicating over TCP:

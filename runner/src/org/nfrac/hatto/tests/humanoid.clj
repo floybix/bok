@@ -14,7 +14,10 @@
 
 (defn b-action
   [info]
-  {})
+  {:joints {:arm-a1-rj 5
+            :arm-b1-rj 2
+            :leg-a2-rj 5
+            :leg-b2-rj 2}})
 
 (defn -main
   "Run the test sketch."
