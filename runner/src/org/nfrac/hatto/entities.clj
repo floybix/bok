@@ -75,10 +75,9 @@
 
 (defn set-joint-motors!
   [entity joint-actions]
-  (doseq [[k v] joint-actions]
-    (if-let [jt (get-in entity [:joints k])]
+  (doseq [[k jt] (:joints entity)]
+    (let [v (get joint-actions k)]
       (do
         (enable-motor! jt (boolean v))
         (when v
-          (motor-speed! jt v)))
-      (println "Joint" k "does not exist."))))
+          (motor-speed! jt v))))))
