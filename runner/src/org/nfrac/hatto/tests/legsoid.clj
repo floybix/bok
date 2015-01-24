@@ -1,6 +1,7 @@
 (ns org.nfrac.hatto.tests.legsoid
   (:require [org.nfrac.hatto.games :as games]
             [org.nfrac.hatto.visual-runner :as visrun]
+            [org.nfrac.hatto.runner :as runner]
             [org.nfrac.hatto.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
@@ -19,8 +20,8 @@
   {:joints {:limb-a1-rj 5
             :limb-b1-rj 0
             :limb-a2-rj -8}
-   :gun {:speed 0.02
-         :fire true}})
+   :gun {:fire true
+         :speed 0.02}})
 
 (defn -main
   "Run the test sketch."
@@ -33,7 +34,7 @@
     (println "legsoid mass:"
              (-> game :entities :player-a ent/entity-mass))
     (-> game
-        (visrun/run-with-display #(visrun/step-local % {:player-a a-action
+        (visrun/run-with-display #(runner/step-local % {:player-a a-action
                                                         :player-b b-action}))
         :final-result
         pprint)))

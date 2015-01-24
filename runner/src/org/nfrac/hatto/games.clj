@@ -13,6 +13,7 @@
      world
      entities
      player-keys
+     dead-players
      time
      dt-secs
      ;; method implementations
@@ -94,6 +95,7 @@
   (map->Game
    {:entities {}
     :player-keys #{}
+    :dead-players #{}
     :time 0.0
     :dt-secs (/ 1 30.0)
     :dt-act-secs (/ 1 15.0)
@@ -271,12 +273,20 @@
                                                (v-scale)
                                                (v-scale 0.5))]]
                          (apply-force! body force (loc-center body))))
-                     (world-step game))
+                     ;; do standard step
+                     (let [game (world-step game)
+                           player-keys (:player-keys game)
+                           dead (distinct
+                                 (map (comp player-keys ::entity user-data)
+                                      (contacting vortex)))]
+                       (if (seq dead)
+                         (update-in game [:dead-players] into dead)
+                         game)))
        :check-end (fn [game]
-                    (let [dead (distinct (map (comp ::entity user-data)
-                                              (contacting vortex)))]
-                      (when (seq dead)
-                        {:winner (first (apply disj (:player-keys game) dead))}))))
+                    (let [{:keys [dead-players player-keys]} game]
+                      (if (>= (count dead-players)
+                              (dec (count player-keys)))
+                        {:winner (first (remove dead-players player-keys))}))))
      (add-players players starting-pts)
      (set-player-vels (keys players) starting-vels))))
 
@@ -617,7 +627,7 @@
         starting-pts [[-10 8] [10 8]]
         GUN_SPEED 1.0
         GUN_AMMO 50
-        GUN_RELOAD 2
+        GUN_RELOAD 2 ;; seconds
         contacts (set-buffering-contact-listener! world)]
     (->
      (assoc empty-game
@@ -647,15 +657,16 @@
                                              :angle ang
                                              :bullet true}
                                       {:shape (box 0.2 0.05)
-                                       :density 10
+                                       :density 20
                                        :group-index group-index
                                        :user-data {::bullet-of player-key}})
-                        impulse (polar-xy 10 ang)]
+                        impulse (polar-xy 25 ang)]
                     (apply-impulse! bullet impulse (center bullet))
                     (apply-impulse! head (v-scale impulse -1) (center head))
                     (-> game
                         (update-in [:player-gun player-key :ammo] dec)
-                        (assoc-in [:player-gun player-key :reload-countdown] GUN_RELOAD)))
+                        (assoc-in [:player-gun player-key :reload-countdown]
+                                  GUN_RELOAD)))
                   ;; otherwise, not firing gun
                   (let [dt (:dt-act-secs game)
                         da (-> (:speed (:gun actions) 0)
@@ -667,22 +678,31 @@
                         (update-in [:player-gun player-key :reload-countdown]
                                    #(max 0 (- % dt))))))))
        :world-step (fn [game]
-                     (world-step game))
+                     ;; do standard step first:
+                     (let [game (world-step game)
+                           hits (keep (fn [{:keys [fixture-a fixture-b]}]
+                                        (cond
+                                         (::bullet-of (user-data fixture-a))
+                                         [fixture-a fixture-b]
+                                         (::bullet-of (user-data fixture-b))
+                                         [fixture-b fixture-a]))
+                                      @contacts)
+                           dead (distinct
+                                 (keep (fn [[_ target-fixt]]
+                                         (->> (body-of target-fixt)
+                                              (user-data)
+                                              ::entity
+                                              (get (:player-keys game))))
+                                       hits))]
+                       (doseq [[bullet-fixt _] hits]
+                         (destroy! (body-of bullet-fixt)))
+                       (swap! contacts empty)
+                       (if (seq dead)
+                         (update-in game [:dead-players] into dead)
+                         game)))
        :check-end (fn [game]
-                    (let [hits (keep (fn [{:keys [fixture-a fixture-b]}]
-                                       (cond
-                                        (::bullet-of (user-data fixture-a))
-                                        [fixture-a fixture-b]
-                                        (::bullet-of (user-data fixture-b))
-                                        [fixture-b fixture-a]))
-                                     @contacts)
-                          dead (set (keep (fn [[_ target-fixt]]
-                                            (get (:player-keys game)
-                                                 (::entity (user-data (body-of target-fixt)))))
-                                          hits))]
-                      (doseq [[bullet-fixt _] hits]
-                        (destroy! (body-of bullet-fixt)))
-                      (swap! contacts empty)
-                      (when (seq dead)
-                        {:winner (first (apply disj (:player-keys game) dead))}))))
+                    (let [{:keys [dead-players player-keys]} game]
+                      (if (>= (count dead-players)
+                              (dec (count player-keys)))
+                        {:winner (first (remove dead-players player-keys))}))))
      (add-players players starting-pts))))

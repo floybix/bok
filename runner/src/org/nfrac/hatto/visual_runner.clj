@@ -2,7 +2,7 @@
   (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
             [org.nfrac.cljbox2d.core :refer [position center angle user-data
                                              body-a body-b anchor-a radius
-                                             fixture-of]]
+                                             fixture-of vary-user-data]]
             [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
@@ -14,23 +14,35 @@
   (/ (reduce + xs)
      (count xs)))
 
-(defn draw-with-labels
+(defn hatto-draw
   [game]
+  ;; if game over, highlight winner vs others
+  (when-let [winner (:winner (:final-result game))]
+    (doseq [player-key (:player-keys game)
+            :let [rgb (if (= player-key winner)
+                        [255 255 255]
+                        [128 64 64])
+                  ent (get-in game [:entities player-key])]]
+      (doseq [body (vals (:components ent))]
+        (vary-user-data body #(assoc % ::bed/rgb rgb)))))
+  ;; standard drawing
   (bed/draw game)
   (let [cam (:camera game)
-        ->px (partial bed/world-to-px cam)]
+        ->px (partial bed/world-to-px cam)
+        px-scale (bed/world-to-px-scale cam)]
     ;; guns
+    (quil/stroke-weight 2)
     (doseq [[player-key gun-info] (:player-gun game)
             :let [head (get-in game [:entities player-key :components :head])
                   gun-length (* 2 (radius (fixture-of head)))
-                  gun-length-px (v-dist (->px [0 0])
-                                        (->px [gun-length 0]))]]
-      (quil/stroke (quil/color 200 200 200))
+                  gun-length-px (* px-scale gun-length)]]
+      (quil/stroke 200)
       (quil/with-translation (->px (position head))
         (quil/with-rotation [(- (:angle gun-info))]
           (quil/line [0 2] [gun-length-px 2])
           (quil/line [0 -2] [gun-length-px -2]))))
-    ;; details
+    (quil/stroke-weight 1)
+    ;; details, labels
     (quil/fill 255)
     (quil/text-align :left)
     (when-not (:show-details? game)
@@ -52,7 +64,7 @@
                    labx laby)
         (when (= 0 (:show-details-level game 0))
           (quil/text-align :center :top)
-          (quil/stroke (quil/color 255 0 0))
+          (quil/stroke [255 0 0])
           (doseq [[cmp-key body] components]
             (doseq [pt (:points-of-interest (user-data body))
                     :let [[x y] (->px (position body pt))]]
@@ -67,8 +79,8 @@
                   :let [anch (anchor-a jt)
                         body-a (body-a jt)
                         body-b (body-b jt)
-                        radius-px (* 2 (v-dist (->px anch)
-                                               (->px (center body-b))))]]
+                        radius-px (* 2 px-scale (v-dist anch
+                                                        (center body-b)))]]
             (quil/stroke (quil/color 255 255 0))
             (quil/fill (quil/color 255 255 0) 64)
             (apply quil/arc (concat (->px anch)
@@ -93,6 +105,28 @@
          (assoc state :error "User quit."))
     (bed/key-press state event)))
 
+(def CONTINUE_SECS 4)
+
+(defn gui-step
+  [game step]
+  (if (:paused? game)
+    game
+    (let [game (step game)]
+      (if-let [res (:final-result game)]
+        ;; game has already ended
+        (if (> (:time game)
+               (+ CONTINUE_SECS (:end-time res)))
+          ;; enough, shut it down
+          (do
+            (quil/exit)
+            game)
+          ;; we are continuing with :dead-players for visual effect
+          game)
+        ;; game has not ended yet
+        (if-let [res (runner/final-result game)]
+          (assoc game :final-result res)
+          game)))))
+
 (defn run-with-display
   [game step]
   (let [p (promise)]
@@ -101,8 +135,9 @@
      :setup (fn []
               (quil/frame-rate 30)
               (merge bed/initial-state game))
-     :update step
-     :draw draw-with-labels
+     :update (fn [game]
+               (gui-step game step))
+     :draw hatto-draw
      :key-typed key-press
      :mouse-pressed bed/mouse-pressed
      :mouse-released bed/mouse-released
@@ -112,35 +147,12 @@
      :on-close (fn [state] (deliver p state)))
     @p))
 
-(defn step-remote
-  [game]
-  (if (:paused? game)
-    game
-    (if-let [res (runner/final-result game)]
-      (do
-        (quil/exit)
-        (assoc game :final-result res))
-      (runner/step-remote game))))
-
-(defn step-local
-  [game action-fns]
-  (if (:paused? game)
-    game
-    (if-let [res (runner/final-result game)]
-      (do
-        (quil/exit)
-        (assoc game :final-result res))
-      (let [world-step (:world-step game)]
-        (-> game
-            (world-step)
-            (runner/take-actions action-fns))))))
-
 (defn main
   [^ZMQ$Context ctx arena-type addrs opts]
   (runner/with-all-connected ctx ZMQ/REQ addrs
     (fn [socks]
       (-> (runner/start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
-          (run-with-display step-remote)
+          (run-with-display runner/step-remote)
           (runner/end-bout)))))
 
 (defn -main

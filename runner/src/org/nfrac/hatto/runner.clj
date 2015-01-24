@@ -38,11 +38,13 @@
   [game action-fns]
   (if (games/act-now? game)
     (let [perceive (:perceive game)
-          act (:act game)]
+          act (:act game)
+          dead? (:dead-players game)]
       (-> (reduce (fn [game [player-key action-fn]]
-                    (let [ob (perceive game player-key)
-                          actions (action-fn ob)]
-                      (act game player-key actions)))
+                    (if (dead? player-key)
+                      (act game player-key {})
+                      (let [actions (action-fn (perceive game player-key))]
+                        (act game player-key actions))))
                   game
                   action-fns)
           (assoc :last-act-time (:time game))))
@@ -51,16 +53,21 @@
 (defn take-remote-actions
   [game]
   (if (games/act-now? game)
-    (let [{:keys [perceive act player-keys bout-id sockets]} game]
+    (let [{:keys [perceive act player-keys bout-id sockets]} game
+          dead? (:dead-players game)]
       (doseq [[player-key sock] sockets]
-        (let [ob (perceive game player-key)]
-          (send-msg sock {:type :react
-                          :bout-id bout-id
-                          :data ob})))
+        (if (dead? player-key)
+          () ;; send msg?
+          (let [ob (perceive game player-key)]
+            (send-msg sock {:type :react
+                            :bout-id bout-id
+                            :data ob}))))
       (-> (reduce (fn [game [player-key sock]]
-                    (let [msg (recv-msg sock)
-                          actions (:data msg)]
-                      (act game player-key actions)))
+                    (if (dead? player-key)
+                      (act game player-key {})
+                      (let [msg (recv-msg sock)
+                            actions (:data msg)]
+                        (act game player-key actions))))
                   game
                   sockets)
           (assoc :last-act-time (:time game))))
@@ -76,12 +83,20 @@
       (catch ZMQException e
         (assoc game :error e)))))
 
+(defn step-local
+  [game action-fns]
+  (let [world-step (:world-step game)]
+    (-> game
+        (world-step)
+        (take-actions action-fns))))
+
 (defn final-result
   [game]
   (if-let [err (:error game)]
     {:error err}
     (let [check-end (:check-end game)]
-      (check-end game))))
+      (when-let [result (check-end game)]
+        (assoc result :end-time (:time game))))))
 
 (defn run-bout
   [game]

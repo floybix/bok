@@ -1,6 +1,7 @@
 (ns org.nfrac.hatto.tests.humanoid
   (:require [org.nfrac.hatto.games :as games]
             [org.nfrac.hatto.visual-runner :as visrun]
+            [org.nfrac.hatto.runner :as runner]
             [org.nfrac.hatto.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
@@ -26,7 +27,7 @@
     (println "humanoid mass:"
              (-> game :entities :player-a ent/entity-mass))
     (-> game
-        (visrun/run-with-display #(visrun/step-local % {:player-a a-action
+        (visrun/run-with-display #(runner/step-local % {:player-a a-action
                                                         :player-b b-action}))
         :final-result
         pprint)))
