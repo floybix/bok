@@ -54,30 +54,26 @@
 
 (def Inf Double/POSITIVE_INFINITY)
 
-(defn check-fallen-down
-  [game y-val]
-  (when (> (:time game) (:game-over-secs game Inf))
+(defn check-dead-or-time-limit
+  [game]
+  (if (> (:time game) (:game-over-secs game Inf))
     {:winner nil}
-    (let [dead (filter (fn [player-key]
-                         (let [player (get-in game [:entities player-key])
-                               head (-> player :components :head)
-                               [x y] (position head)]
-                           ;; head has fallen below death level
-                           (< y y-val)))
-                       (:player-keys game))]
-      (when (seq dead)
-        {:winner (first (apply disj (:player-keys game) dead))}))))
+    (let [{:keys [dead-players player-keys]} game]
+      (if (>= (count dead-players)
+              (dec (count player-keys)))
+        {:winner (first (remove dead-players player-keys))}))))
 
 (defn check-highest
   [game]
   (when (> (:time game) (:game-over-secs game Inf))
-    (let [heights (into {}
-                        (map (fn [player-key]
-                               (let [player (get-in game [:entities player-key])
-                                     head (-> player :components :head)
-                                     [x y] (position head)]
-                                 [player-key y]))
-                             (:player-keys game)))
+    (let [heights (->>
+                   (map (fn [player-key]
+                          (let [player (get-in game [:entities player-key])
+                                head (-> player :components :head)
+                                [x y] (position head)]
+                            [player-key y]))
+                        (:player-keys game))
+                   (into {}))
           highest (apply max-key heights (:player-keys game))]
       {:winner highest
        :heights heights})))
@@ -103,7 +99,7 @@
     :perceive perceive
     :act act-on-joints
     :world-step world-step
-    :check-end (fn [game] nil)}))
+    :check-end check-dead-or-time-limit}))
 
 (defn act-now?
   [{:keys [time dt-act-secs last-act-time]}]
@@ -206,8 +202,20 @@
        :entities {:arena arena}
        :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
        :game-over-secs 60.0
-       :check-end (fn [game]
-                    (check-fallen-down game -2)))
+       :world-step
+       (fn [game]
+         (let [game (world-step game)
+               Y_DEAD -2
+               dead (filter (fn [player-key]
+                              (let [player (get-in game [:entities player-key])
+                                    head (-> player :components :head)
+                                    [x y] (position head)]
+                                ;; head has fallen below death level
+                                (< y Y_DEAD)))
+                            (:player-keys game))]
+           (if (seq dead)
+             (update-in game [:dead-players] into dead)
+             game))))
      (add-players players starting-pts))))
 
 ;; =============================================================================
@@ -281,12 +289,7 @@
                                       (contacting vortex)))]
                        (if (seq dead)
                          (update-in game [:dead-players] into dead)
-                         game)))
-       :check-end (fn [game]
-                    (let [{:keys [dead-players player-keys]} game]
-                      (if (>= (count dead-players)
-                              (dec (count player-keys)))
-                        {:winner (first (remove dead-players player-keys))}))))
+                         game))))
      (add-players players starting-pts)
      (set-player-vels (keys players) starting-vels))))
 
@@ -699,10 +702,5 @@
                        (swap! contacts empty)
                        (if (seq dead)
                          (update-in game [:dead-players] into dead)
-                         game)))
-       :check-end (fn [game]
-                    (let [{:keys [dead-players player-keys]} game]
-                      (if (>= (count dead-players)
-                              (dec (count player-keys)))
-                        {:winner (first (remove dead-players player-keys))}))))
+                         game))))
      (add-players players starting-pts))))

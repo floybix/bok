@@ -64,7 +64,7 @@
                    labx laby)
         (when (= 0 (:show-details-level game 0))
           (quil/text-align :center :top)
-          (quil/stroke [255 0 0])
+          (quil/stroke (quil/color 255 0 0))
           (doseq [[cmp-key body] components]
             (doseq [pt (:points-of-interest (user-data body))
                     :let [[x y] (->px (position body pt))]]
