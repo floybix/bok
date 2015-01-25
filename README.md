@@ -2,10 +2,11 @@
 
 Early stage - experiments only.
 
-Hatto are programming games. You don't play these games directly.
-Instead you write a program to control a creature. Your program is the
-player, and you tell it how to play. The games take place in a 2D
-world, with collisions and gravity and such like.
+Hatto are programming games. You don't play these games directly,
+rather you write programs to play them. Your programs control
+creatures in a 2D world, with collisions and gravity and such like.
+Join games with others locally or over the network, while you
+(optionally) watch the fun.
 
 See:
 
@@ -14,6 +15,16 @@ See:
 [Creatures](https://github.com/floybix/hatto/wiki/Creatures)
 
 [How to play](https://github.com/floybix/hatto/wiki/How-to-play)
+
+
+## Rationale
+
+1. Fun
+
+2. Test evolution and intelligence algorithms in a rich-enough problem
+domain, and compare them to human-designed solutions.
+
+3. To learn network programming.
 
 
 ## Running bouts
