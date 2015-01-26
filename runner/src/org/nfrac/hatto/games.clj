@@ -127,16 +127,6 @@
     (linear-velocity! body vel))
   game)
 
-(defn edge-chain
-  [vertices attrs]
-  (for [[v0 v1] (partition 2 1 vertices)]
-    (merge {:shape (edge v0 v1)} attrs)))
-
-(defn edge-loop
-  [vertices attrs]
-  (edge-chain (concat vertices (take 1 vertices))
-              attrs))
-
 ;; =============================================================================
 
 (defmulti build*
@@ -234,9 +224,9 @@
                     [12 10]
                     [12 -10]]
         fence (with-pois
-                (apply body! world {:type :static}
-                       (edge-loop fence-pois
-                                  {:friction 1}))
+                (body! world {:type :static}
+                       {:shape (edge-loop fence-pois)
+                        :friction 1})
                 fence-pois)
         wall-fx {:shape (box 3 0.2)
                  :friction 1}
@@ -313,9 +303,9 @@
                            1.5))])
         pois (for [z [0 1/3 2/3 1]]
                (nth surface (* z (dec (count surface)))))
-        ground (apply body! world {:type :static}
-                      (edge-chain surface
-                                  {:friction 1}))
+        ground (body! world {:type :static}
+                      {:shape (edge-chain surface)
+                       :friction 1})
         plat-fx {:shape (edge [-5.5 0] [5.5 0])
                  :friction 1}
         plat-pois [[-5.5 0] [5.5 0]]
@@ -408,9 +398,9 @@
   (let [world (new-world)
         surface [[-16 0] [-4 0] [0 -2] [4 0] [16 0]]
         ground (with-pois
-                 (apply body! world {:type :static}
-                        (edge-chain surface
-                                    {:friction 1}))
+                 (body! world {:type :static}
+                        {:shape (edge-chain surface)
+                         :friction 1})
                  surface)
         ceil-y 16
         ceiling (body! world {:type :static}
@@ -522,19 +512,19 @@
                     [15 7]
                     [15 -7]]
         fence (with-pois
-                (apply body! world {:type :static
-                                    :position [0 7]}
-                       (edge-loop fence-pois
-                                  {:friction 1}))
+                (body! world {:type :static
+                              :position [0 7]}
+                       {:shape (edge-loop fence-pois)
+                        :friction 1})
                 fence-pois)
         ;; -4m to left, 4.1m to right, 2.3m up
         pedestal-pts [[-4.0 0.0] [-2.5 0.2] [-2.0 0.5] [-2.1 1.1] [-1.9 1.8] [-1.5 2.0]
                       [4.0 2.3] [4.1 2.1] [3.5 1.7] [3.0 1.0] [3.1 0.7] [3.25 0.0]]
         pedestal (with-pois
-                   (apply body! world {:type :static
-                                       :position [2 0]}
-                          (edge-chain pedestal-pts
-                                      {:friction 1}))
+                   (body! world {:type :static
+                                 :position [2 0]}
+                          {:shape (edge-chain pedestal-pts)
+                           :friction 1})
                    pedestal-pts)
         ;; 3m to left, 3.5m to right
         r-ramp-pts (into [[-3.0 0.0] [-2.0 1.0] [-1 0.9] [0.0 0.5]]
@@ -544,10 +534,10 @@
                                      (interpose [0.0 0.5]
                                                 (repeat 7 [0.5 0.0]))))
         r-ramp (with-pois
-                 (apply body! world {:type :static
-                                     :position [(- 15 3.5) 0]}
-                        (edge-chain r-ramp-pts
-                                    {:friction 1}))
+                 (body! world {:type :static
+                               :position [(- 15 3.5) 0]}
+                        {:shape (edge-chain r-ramp-pts)
+                         :friction 1})
                  r-ramp-pts)
         ;; 3m to left, 3m to right. 1.5m down, 1m up
         steps-pts (reductions v-add
@@ -555,28 +545,28 @@
                               (interpose [0.0 0.5]
                                          (repeat 6 [-1.0 0.0])))
         steps (with-pois
-                (apply body! world {:type :static
-                                    :position [(- 15 7) 7]}
-                       (edge-chain steps-pts
-                                   {:friction 1}))
+                (body! world {:type :static
+                              :position [(- 15 7) 7]}
+                       {:shape (edge-chain steps-pts)
+                        :friction 1})
                 steps-pts)
         ;; 1m to left, 1.5m to right
         l-ramp-pts [[-1.0 1.2] [0.5 0.3] [1.5 0.0]]
         l-ramp (with-pois
-                 (apply body! world {:type :static
-                                     :position [(+ -15 1) 0]}
-                        (edge-chain l-ramp-pts
-                                    {:friction 1}))
+                 (body! world {:type :static
+                               :position [(+ -15 1) 0]}
+                        {:shape (edge-chain l-ramp-pts)
+                         :friction 1})
                  l-ramp-pts)
         ;; 7m to left, 7m to right. 3m down, 2m up
         slope-pts [[-7 -3] [-6 -3] [-5 -2.5] [-4.2 -2.6] [-3 -2] [-2 -1.8]
                    [-1.6 -1.1] [-0.5 -0.9] [0 -1] [1 -0.7] [1.5 0.1] [2 0]
                    [2.1 0.5] [3 1] [5 1] [5.5 1.2] [6 2] [7 2]]
         slope (with-pois
-                (apply body! world {:type :static
-                                    :position [-5 6]}
-                       (edge-chain slope-pts
-                                   {:friction 1}))
+                (body! world {:type :static
+                              :position [-5 6]}
+                       {:shape (edge-chain slope-pts)
+                        :friction 1})
                 slope-pts)
         ;; 3m to left, 3m to right
         plat-fx {:shape (edge [-3 0] [3 0])
