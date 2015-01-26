@@ -165,7 +165,7 @@
     (-> (assoc empty-game
           :world world
           :entities {:arena arena}
-          :camera {:width 40 :height 20 :x-left -20 :y-bottom -5})
+          :camera {:width 40 :height 20 :center [0 5]})
         (add-players players starting-pts))))
 
 ;; =============================================================================
@@ -190,7 +190,7 @@
      (assoc empty-game
        :world world
        :entities {:arena arena}
-       :camera {:width 40 :height 20 :x-left -20 :y-bottom -5}
+       :camera {:width 40 :height 20 :center [0 5]}
        :game-over-secs 60.0
        :world-step
        (fn [game]
@@ -261,7 +261,7 @@
      (assoc empty-game
        :world world
        :entities {:arena arena}
-       :camera {:width 32 :height 24 :x-left -16 :y-bottom -12}
+       :camera {:width 32 :height 24 :center [0 0]}
        :world-step (fn [game]
                      (let [vort-pos (position vortex)]
                        (doseq [k (:player-keys game)
@@ -351,7 +351,7 @@
        :world world
        :entities {:arena arena
                   :food food}
-       :camera {:width 40 :height 20 :x-left -20 :y-bottom -1}
+       :camera {:width 40 :height 20 :center [0 9]}
        :player-energy (zipmap (keys players) (repeat 300.0))
        :game-over-secs 60.0
        :world-step
@@ -488,7 +488,7 @@
        :world world
        :entities {:arena arena
                   }
-       :camera {:width 40 :height 20 :x-left -20 :y-bottom -3}
+       :camera {:width 40 :height 20 :center [0 7]}
        :game-over-secs 60.0
        :check-end (fn [game]
                     (check-highest game)))
@@ -626,7 +626,7 @@
      (assoc empty-game
        :world world
        :entities {:arena arena}
-       :camera {:width 32 :height 16 :x-left -16 :y-bottom -1}
+       :camera {:width 32 :height 16 :center [0 7]}
        :player-gun (zipmap (keys players)
                            (repeat {:angle 0.0
                                     :ammo GUN_AMMO

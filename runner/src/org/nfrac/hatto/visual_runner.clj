@@ -28,7 +28,7 @@
   ;; standard drawing
   (bed/draw game)
   (let [cam (:camera game)
-        ->px (partial bed/world-to-px cam)
+        ->px (bed/world-to-px-fn cam)
         px-scale (bed/world-to-px-scale cam)]
     ;; guns
     (quil/stroke-weight 2)
@@ -45,13 +45,11 @@
     ;; details, labels
     (quil/fill 255)
     (quil/text-align :left)
-    (when-not (:show-details? game)
-      (quil/text "Press ? for details." 10 10))
-    (when (:show-details? game)
-      (quil/text (str "Drag bodies to move them. Right-button drag to pan. +/- to zoom.\n"
-                      "Press space to pause. Press q to quit.\n"
-                      "Press d to switch display detail.")
-                 10 10)
+    (quil/text (format "t = %.1f" (:time game))
+               10 (quil/height))
+    (when (zero? (::detail-level game 0))
+      (quil/text "Press d to show details." 10 10))
+    (when (pos? (::detail-level game 0))
       (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
                     mid-x (mean (map (comp first position)
@@ -62,7 +60,7 @@
         (quil/text-align :center :top)
         (quil/text (name ent-key)
                    labx laby)
-        (when (= 0 (:show-details-level game 0))
+        (when (== 1 (::detail-level game))
           (quil/text-align :center :top)
           (quil/stroke (quil/color 255 0 0))
           (doseq [[cmp-key body] components]
@@ -73,7 +71,7 @@
               (quil/with-rotation [(- (angle body))]
                 (quil/text (name cmp-key)
                            0 0)))))
-        (when (= 1 (:show-details-level game 0))
+        (when (== 2 (::detail-level game))
           (quil/text-align :right :center)
           (doseq [[jt-key jt] joints
                   :let [anch (anchor-a jt)
@@ -97,9 +95,8 @@
   "Standard actions for key events"
   [state event]
   (case (:raw-key event)
-    (\/ \?) (update-in state [:show-details?] not)
-    \d (update-in state [:show-details-level] (fn [i] (-> (inc (or i 0))
-                                                         (mod 2))))
+    \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
+                                                    (mod 3))))
     \q (do
          (quil/exit)
          (assoc state :error "User quit."))
@@ -142,7 +139,9 @@
      :mouse-pressed bed/mouse-pressed
      :mouse-released bed/mouse-released
      :mouse-dragged bed/mouse-dragged
+     :mouse-wheel bed/mouse-wheel
      :size [1200 600]
+     :features [:resizable]
      :middleware [quil.middleware/fun-mode]
      :on-close (fn [state] (deliver p state)))
     @p))
