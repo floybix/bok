@@ -15,36 +15,51 @@
   (/ (reduce + xs)
      (count xs)))
 
+(defn colors*
+  []
+  {:background (quil/color 200 200 160)
+   :text (quil/color 0 0 0)
+   :static (quil/color 128 0 0)
+   :kinematic (quil/color 128 0 0)
+   :dynamic (quil/color 128 64 0)
+   :joint (quil/color 64 0 64)
+   :poi (quil/color 255 255 255)
+   :gun (quil/color 64 0 32)})
+
+(def winner-rgb [100 100 200])
+(def loser-rgb [32 32 32])
+
 (defn bok-draw
   [game]
   ;; if game over, highlight winner vs others
   (when-let [winner (:winner (:final-result game))]
     (doseq [player-key (:player-keys game)
             :let [rgb (if (= player-key winner)
-                        [255 255 255]
-                        [128 64 64])
+                        winner-rgb
+                        loser-rgb)
                   ent (get-in game [:entities player-key])]]
       (doseq [body (vals (:components ent))]
         (vary-user-data body #(assoc % ::bed/rgb rgb)))))
-  ;; standard drawing
-  (bed/draw game)
   (let [cam (:camera game)
         ->px (bed/world-to-px-fn cam)
-        px-scale (bed/world-to-px-scale cam)]
+        px-scale (bed/world-to-px-scale cam)
+        colors (colors*)]
+    ;; standard drawing
+    (bed/draw (assoc game ::bed/colors colors))
     ;; guns
+    (quil/stroke (:gun colors))
     (quil/stroke-weight 2)
     (doseq [[player-key gun-info] (:player-gun game)
             :let [head (get-in game [:entities player-key :components :head])
                   gun-length (* 2 (radius (fixture-of head)))
                   gun-length-px (* px-scale gun-length)]]
-      (quil/stroke 200)
       (quil/with-translation (->px (position head))
         (quil/with-rotation [(- (:angle gun-info))]
           (quil/line [0 2] [gun-length-px 2])
           (quil/line [0 -2] [gun-length-px -2]))))
     (quil/stroke-weight 1)
     ;; details, labels
-    (quil/fill 255)
+    (quil/fill (:text colors))
     (quil/text-align :left)
     (quil/text (format "t = %.1f" (:time game))
                10 (- (quil/height) 5))
@@ -70,15 +85,19 @@
         (when (== 1 (::detail-level game))
           (quil/text-align :center)
           ;; label the entity
+          (quil/fill (:text colors))
           (quil/text (name ent-key)
                      labx laby)
-          (quil/stroke (quil/color 255 0 0))
           (doseq [[cmp-key body] components]
+            ;; draw the points of interest
+            (quil/stroke (:text colors))
+            (quil/fill (:poi colors))
             (doseq [pt (:points-of-interest (user-data body))
                     :let [[x y] (->px (position body pt))]]
-              (quil/ellipse x y 10 10))
+              (quil/ellipse x y 8 8))
             (when-not simple-ent?
               ;; label the components
+              (quil/fill (:text colors))
               (quil/with-translation (->px (center body))
                 (quil/with-rotation [(- (angle body))]
                   (quil/text (name cmp-key)
@@ -92,13 +111,13 @@
                         body-b (body-b jt)
                         radius-px (* 2 px-scale (v-dist anch
                                                         (center body-b)))]]
-            (quil/stroke (quil/color 255 255 0))
-            (quil/fill (quil/color 255 255 0) 64)
+            (quil/stroke (:joint colors))
+            (quil/fill (:joint colors) 64)
             (apply quil/arc (concat (->px anch)
                                     (repeat 2 (* 2 radius-px))
                                     [(- 0 (angle body-b) 0.5)
                                      (- (angle body-b))]))
-            (quil/fill 255)
+            (quil/fill (:text colors))
             (quil/with-translation (->px anch)
               (quil/with-rotation [(- 0 (angle body-b) 0.25)]
                 (quil/text (name jt-key)

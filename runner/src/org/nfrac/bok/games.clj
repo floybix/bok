@@ -260,7 +260,7 @@
                 (body! world {:type :static
                               :position [0 0]
                               :user-data {:org.nfrac.cljbox2d.testbed/rgb
-                                          [255 0 0]}}
+                                          [64 0 64]}}
                        {:shape (circle 1.0)}))
         entities (into {:fence fence
                         :vortex vortex}
@@ -385,10 +385,10 @@
                       energy (+ (get-in game [:player-energy player-key])
                                 (- e-gain e-loss))]
                   (vary-user-data head #(assoc % :org.nfrac.cljbox2d.testbed/rgb
-                                               [(-> energy (/ 2) (max 128) (min 255))
-                                                (-> energy (/ 1) (max 0) (min 255))
-                                                (- (-> energy (/ 2) (max 128) (min 255))
-                                                   128)]))
+                                               [(-> energy (/ 2) (max 0) (min 255))
+                                                0
+                                                (- (-> energy (/ 2) (max 128) (min 255)) 128)
+                                                ]))
                   (when snack
                     (destroy! snack))
                   (-> (if snack
