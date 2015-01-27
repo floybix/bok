@@ -10,7 +10,8 @@
   {:joints {:arm-a1-rj -10
             :arm-b1-rj -2
             :leg-a2-rj 5
-            :leg-b2-rj 2}})
+            :leg-b2-rj 2
+            :pelvis-rj 0}})
 
 (defn b-action
   [info]

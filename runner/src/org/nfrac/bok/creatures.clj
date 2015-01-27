@@ -8,12 +8,13 @@
     type))
 
 (defn revo-joint!
-  [body-a body-b world-anchor]
-  (joint! {:type :revolute
-           :body-a body-a
-           :body-b body-b
-           :world-anchor world-anchor
-           :max-motor-torque 100}))
+  [body-a body-b world-anchor & {:as more}]
+  (joint! (into {:type :revolute
+                 :body-a body-a
+                 :body-b body-b
+                 :world-anchor world-anchor
+                 :max-motor-torque 100}
+                more)))
 
 (defn limb
   "Builds a limb of `n-segments`, each of length `seg-len` metres.
@@ -81,7 +82,6 @@
         torso-pts [[0.00 0.50]
                    [-0.25 0.25]
                    [-0.25 -0.25]
-                   [0.00 -0.50]
                    [0.25 -0.25]
                    [0.25 0.25]]
         torso-pois [[-0.25 0.0]
@@ -94,11 +94,23 @@
                   (set-pois torso-pois))
         wj (joint! {:type :weld :body-a head :body-b torso
                     :world-anchor head-pos})
+        pelvis-pos (v-add torso-pos [0.0 -0.40])
+        pelvis (-> (body! world {:position pelvis-pos
+                                 :fixed-rotation true}
+                          {:shape (circle 0.25)
+                           :density 5
+                           :friction 0.5
+                           :group-index group-index})
+                   (set-pois [[0 0]]))
+        pelvis-rj (revo-joint! pelvis torso pelvis-pos
+                               ;:enable-limit true
+                               :lower-angle (- (/ Math/PI 2))
+                               :upper-angle (/ Math/PI 2))
         limb-spec {:density 10
                    :friction 0.5
                    :group-index group-index}
         arm-pos (v-add torso-pos [0.0 0.40])
-        leg-pos (v-add torso-pos [0.0 -0.40])
+        leg-pos pelvis-pos
         limbs (merge-with
                merge ;; merge nested maps
                (limb world torso arm-pos 0.75 limb-spec
@@ -111,8 +123,10 @@
                      :n-segments 2 :prefix "leg-b"))]
     (entity (assoc (:components limbs)
               :head head
-              :torso torso)
-            :joints (:joints limbs)
+              :torso torso
+              :pelvis pelvis)
+            :joints (assoc (:joints limbs)
+                      :pelvis-rj pelvis-rj)
             :entity-type :creature
             :creature-type type
             :group-index group-index)))

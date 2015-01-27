@@ -53,7 +53,7 @@ Or try running player servers communicating over TCP:
 ```
 cd bok/players/clojure
 lein run -m org.nfrac.bok.examples.legsoid1 5555
-lein run -m org.nfrac.bok.examples.legsoid1 5556
+lein run -m org.nfrac.bok.examples.humanoid1 5556
 cd bok/runner
 lein run -m org.nfrac.bok.visual-runner sumo tcp://localhost:5555 tcp://localhost:5556
 ```
