@@ -1,13 +1,33 @@
 (ns org.nfrac.hatto.entities
   (:require [org.nfrac.cljbox2d.core :refer :all]))
 
+(def ENTITY_TYPES #{:fixed :movable :food :creature})
+
 (defrecord Entity [entity-type components joints])
 
 (defrecord PointState [point position velocity])
 
-(defn with-pois
+(defn set-pois
   [body pois]
   (vary-user-data body #(assoc % :points-of-interest pois)))
+
+(defn entity
+  [components & {:keys [entity-type]
+                 :or {entity-type :fixed}
+                 :as attrs}]
+  {:pre (ENTITY_TYPES entity-type)}
+  (map->Entity (assoc attrs
+                 :components components)))
+
+(defn simple-entity
+  [pois body & more-args]
+  (let [components {:it (set-pois body pois)}]
+    (apply entity components more-args)))
+
+(defn entity-body
+  "For simple entities, returns the single component Body."
+  [ent]
+  (first (vals (:components ent))))
 
 (defn entity-mass
   [entity]

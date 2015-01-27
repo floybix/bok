@@ -1,14 +1,14 @@
 (ns org.nfrac.hatto.games
-  (:require [org.nfrac.hatto.entities :as ent :refer [with-pois map->Entity]]
+  (:require [org.nfrac.hatto.entities :as ent :refer [simple-entity]]
             [org.nfrac.hatto.creatures :as creatures]
             [org.nfrac.cljbox2d.core :refer :all]
-            [org.nfrac.cljbox2d.vec2d :refer [v-add v-sub polar-xy v-interp v-scale]]))
+            [org.nfrac.cljbox2d.vec2d
+             :refer [v-add v-sub polar-xy v-interp v-scale]]))
 
 ;; =============================================================================
 
 (defrecord Game
     [game-type
-     game-attributes
      game-version
      world
      entities
@@ -29,8 +29,8 @@
   [game player-key]
   (let [inv-dt (/ 1 (:dt-secs game))
         me (get-in game [:entities player-key])
-        obs (reduce-kv (fn [m k entity]
-                         (assoc m k (ent/perceive-entity entity inv-dt)))
+        obs (reduce-kv (fn [m k ent]
+                         (assoc m k (ent/perceive-entity ent inv-dt)))
                        {}
                        (:entities game))]
     {:time (:time game)
@@ -96,6 +96,7 @@
     :dt-secs (/ 1 30.0)
     :dt-act-secs (/ 1 15.0)
     :last-act-time 0.0
+    ;; default method implementations
     :perceive perceive
     :act act-on-joints
     :world-step world-step
@@ -134,13 +135,14 @@
     type))
 
 (defn build
-  "Returns a Game record where all Body objects have their entity key
-   in user-data ::entity and component key in ::component."
+  "Returns a Game record where all Body objects have their entity and
+   components keys attached in user-data ::entity and ::component."
   [type players opts]
   (let [game (build* type players opts)]
     (doseq [[ent-k ent] (:entities game)
             [cmp-k cmp] (:components ent)]
-      (vary-user-data cmp #(assoc % ::entity ent-k ::component cmp-k)))
+      (vary-user-data cmp #(assoc % ::entity ent-k
+                                  ::component cmp-k)))
     game))
 
 ;; =============================================================================
@@ -151,20 +153,30 @@
 (defmethod build* :sandbox
   [type players _]
   (let [world (new-world)
-        ground (body! world {:type :static}
-                      {:shape (box 15 20 [0 -20])
-                       :friction 1.0}
-                      {:shape (edge [-15 0] [-15 15])}
-                      {:shape (edge [15 0] [15 15])})
-        pois [[-15 0] [15 0]]
-        arena (map->Entity
-               {:entity-type :arena
-                :arena-type type
-                :components {:ground (with-pois ground pois)}})
+        ground (simple-entity
+                [[-15 0] [15 0]]
+                (body! world {:type :static}
+                       {:shape (box 15 20 [0 -20])
+                        :friction 1.0}))
+        left-wall (simple-entity
+                   [[0 0] [0 15]]
+                   (body! world {:type :static
+                                 :position [-15 0]}
+                          {:shape (edge [0 0] [0 15])}))
+        right-wall (simple-entity
+                    [[0 0] [0 15]]
+                    (body! world {:type :static
+                                  :position [15 0]}
+                           {:shape (edge [0 0] [0 15])}))
+        entities {:ground ground
+                  :left-wall left-wall
+                  :right-wall right-wall}
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (-> (assoc empty-game
           :world world
-          :entities {:arena arena}
+          :game-type type
+          :game-version [0 0 1]
+          :entities entities
           :camera {:width 40 :height 20 :center [0 5]})
         (add-players players starting-pts))))
 
@@ -177,19 +189,19 @@
 (defmethod build* :sumo
   [type players _]
   (let [world (new-world)
-        ground (body! world {:type :static}
-                      {:shape (box 15 20 [0 -20])
-                       :friction 1.0})
-        pois [[-15 0] [15 0]]
-        arena (map->Entity
-               {:entity-type :arena
-                :arena-type type
-                :components {:ground (with-pois ground pois)}})
+        ground (simple-entity
+                [[-15 0] [15 0]]
+                (body! world {:type :static}
+                       {:shape (box 15 20 [0 -20])
+                        :friction 1.0}))
+        entities {:ground ground}
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (->
      (assoc empty-game
        :world world
-       :entities {:arena arena}
+       :game-type type
+       :game-version [0 0 1]
+       :entities entities
        :camera {:width 40 :height 20 :center [0 5]}
        :game-over-secs 60.0
        :world-step
@@ -223,11 +235,11 @@
                     [-12 10]
                     [12 10]
                     [12 -10]]
-        fence (with-pois
-                (body! world {:type :static}
-                       {:shape (edge-loop fence-pois)
-                        :friction 1})
-                fence-pois)
+        fence (simple-entity
+               fence-pois
+               (body! world {:type :static}
+                      {:shape (edge-loop fence-pois)
+                       :friction 1}))
         wall-fx {:shape (box 3 0.2)
                  :friction 1}
         wall-pois [[-3 0] [3 0]]
@@ -237,33 +249,35 @@
                                     [-5 -5]
                                     [-5 5]
                                     [5 5]] i)]]
-                [k (with-pois
-                     (body! world {:type :static
-                                   :position pos
-                                   :angle (* Math/PI (/ i 2))}
-                            wall-fx)
-                     wall-pois)])
-        vortex (with-pois
-                 (body! world {:type :static
-                               :position [0 0]
-                               :user-data {:org.nfrac.cljbox2d.testbed/rgb [255 0 0]}}
-                        {:shape (circle 1.0)})
-                 [[0 0]])
-        arena (map->Entity
-               {:entity-type :arena
-                :arena-type type
-                :components (into {:fence fence
-                                   :vortex vortex}
-                                  walls)})
+                [k (simple-entity
+                    wall-pois
+                    (body! world {:type :static
+                                  :position pos
+                                  :angle (* Math/PI (/ i 2))}
+                           wall-fx))])
+        vortex (simple-entity
+                [[0 0]]
+                (body! world {:type :static
+                              :position [0 0]
+                              :user-data {:org.nfrac.cljbox2d.testbed/rgb
+                                          [255 0 0]}}
+                       {:shape (circle 1.0)}))
+        entities (into {:fence fence
+                        :vortex vortex}
+                       walls)
+        vortex-body (ent/entity-body vortex)
         starting-pts [[-8 0] [8 0]]
         starting-vels [[-3 -3] [3 3]]]
     (->
      (assoc empty-game
        :world world
-       :entities {:arena arena}
+       :game-type type
+       :game-version [0 0 1]
+       :entities entities
        :camera {:width 32 :height 24 :center [0 0]}
        :world-step (fn [game]
-                     (let [vort-pos (position vortex)]
+                     ;; apply suction force towards vortex
+                     (let [vort-pos (position vortex-body)]
                        (doseq [k (:player-keys game)
                                body (vals (get-in game [:entities k :components]))
                                :let [pos (center body)
@@ -273,10 +287,11 @@
                          (apply-force! body force (loc-center body))))
                      ;; do standard step
                      (let [game (world-step game)
+                           ;; kill players touching vortex
                            player-keys (:player-keys game)
                            dead (distinct
                                  (map (comp player-keys ::entity user-data)
-                                      (contacting vortex)))]
+                                      (contacting vortex-body)))]
                        (if (seq dead)
                          (update-in game [:dead-players] into dead)
                          game))))
@@ -294,35 +309,35 @@
 (defmethod build* :energy-race
   [type players _]
   (let [world (new-world)
-        surface (for [x (range -20 20.01 0.2)]
-                  [x (+ (* (Math/pow x 4)
-                           (/ (Math/pow 20 4))
-                           20.0)
-                        (* (Math/cos (* x 5))
-                           (/ (* x x) (* 20 20))
-                           1.5))])
-        pois (for [z [0 1/3 2/3 1]]
-               (nth surface (* z (dec (count surface)))))
-        ground (body! world {:type :static}
-                      {:shape (edge-chain surface)
-                       :friction 1})
+        ground-pts (for [x (range -20 20.01 0.2)]
+                     [x (+ (* (Math/pow x 4)
+                              (/ (Math/pow 20 4))
+                              20.0)
+                           (* (Math/cos (* x 5))
+                              (/ (* x x) (* 20 20))
+                              1.5))])
+        ground-pois (for [z [0 1/3 2/3 1]]
+                      (nth ground-pts (* z (dec (count ground-pts)))))
+        ground (simple-entity
+                ground-pois
+                (body! world {:type :static}
+                       {:shape (edge-chain ground-pts)
+                        :friction 1}))
         plat-fx {:shape (edge [-5.5 0] [5.5 0])
                  :friction 1}
         plat-pois [[-5.5 0] [5.5 0]]
-        plat-right (body! world {:type :static
-                                 :position [8 14]}
-                          plat-fx)
-        plat-left (body! world {:type :static
-                                :position [-8 14]}
-                         plat-fx)
-        arena (map->Entity
-               {:entity-type :arena
-                :arena-type type
-                :components {:ground (with-pois ground pois)
-                             :plat-left (with-pois plat-left plat-pois)
-                             :plat-right (with-pois plat-right plat-pois)}})
+        plat-right (simple-entity
+                    plat-pois
+                    (body! world {:type :static
+                                  :position [8 14]}
+                           plat-fx))
+        plat-left (simple-entity
+                   plat-pois
+                   (body! world {:type :static
+                                 :position [-8 14]}
+                          plat-fx))
         ;; place food by scanning down from above at regular intervals
-        food-pos (for [sign [-1 1]
+        food-pts (for [sign [-1 1]
                        xa (concat [2 4 6]
                                   (range 10.4 20))
                        :let [x (* sign xa)]]
@@ -333,53 +348,55 @@
                            [0 0]))))
         food-fx {:shape (polygon [[0 0.5] [-0.25 0] [0.25 0]])
                  :density 5 :restitution 0 :friction 1}
-        food (map->Entity
-              {:entity-type :food
-               :components
-               (into {}
-                     (map-indexed (fn [i pos]
-                                    (let [k (keyword (str "food-" i))]
-                                      [k (with-pois
-                                           (body! world {:position pos
-                                                         :user-data {:joules 200.0}}
-                                                  food-fx)
-                                           [[0 0]])]))
-                                  food-pos))})
+        foods (map-indexed (fn [i pos]
+                             (let [k (keyword (str "food-" i))]
+                               [k (simple-entity
+                                   [[0 0]]
+                                   (body! world {:position pos
+                                                 :user-data {:food-joules 200.0}}
+                                          food-fx)
+                                   :entity-type :food)]))
+                           food-pts)
+        entities (into {:ground ground
+                        :plat-left plat-left
+                        :plat-right plat-right}
+                       foods)
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (->
      (assoc empty-game
        :world world
-       :entities {:arena arena
-                  :food food}
+       :game-type type
+       :game-version [0 0 1]
+       :entities entities
        :camera {:width 40 :height 20 :center [0 9]}
        :player-energy (zipmap (keys players) (repeat 300.0))
        :game-over-secs 60.0
        :world-step
        (fn [game]
-         (-> (reduce (fn [game player-key]
-                       (let [me (get-in game [:entities player-key])
-                             e-loss (ent/entity-work-joules me (:dt-secs game))
-                             head (get-in me [:components :head])
-                             snack (first (filter (comp #(= % :food) ::entity user-data)
-                                                  (contacting head)))
-                             snack-k (when snack (::component (user-data snack)))
-                             e-gain (if snack (:joules (user-data snack)) 0)
-                             energy (+ (get-in game [:player-energy player-key])
-                                       (- e-gain e-loss))]
-                         (vary-user-data head #(assoc % :org.nfrac.cljbox2d.testbed/rgb
-                                                      [(-> energy (/ 2) (max 128) (min 255))
-                                                       (-> energy (/ 1) (max 0) (min 255))
-                                                       (- (-> energy (/ 2) (max 128) (min 255))
-                                                          128)]))
-                         (when snack
-                           (destroy! snack))
-                         (-> (if snack
-                               (update-in game [:entities :food :components]
-                                          dissoc snack-k)
-                               game)
-                             (update-in [:player-energy] assoc player-key energy))))
-                     game
-                     (:player-keys game))
+         (-> (reduce
+              (fn [game player-key]
+                (let [me (get-in game [:entities player-key])
+                      e-loss (ent/entity-work-joules me (:dt-secs game))
+                      head (get-in me [:components :head])
+                      snack (first (filter (comp :food-joules user-data)
+                                           (contacting head)))
+                      snack-k (when snack (::entity (user-data snack)))
+                      e-gain (if snack (:food-joules (user-data snack)) 0)
+                      energy (+ (get-in game [:player-energy player-key])
+                                (- e-gain e-loss))]
+                  (vary-user-data head #(assoc % :org.nfrac.cljbox2d.testbed/rgb
+                                               [(-> energy (/ 2) (max 128) (min 255))
+                                                (-> energy (/ 1) (max 0) (min 255))
+                                                (- (-> energy (/ 2) (max 128) (min 255))
+                                                   128)]))
+                  (when snack
+                    (destroy! snack))
+                  (-> (if snack
+                        (update-in game [:entities] dissoc snack-k)
+                        game)
+                      (update-in [:player-energy] assoc player-key energy))))
+              game
+              (:player-keys game))
              (world-step)))
        :check-end (fn [game]
                     (check-max-energy game)))
@@ -396,16 +413,18 @@
 (defmethod build* :altitude
   [type players _]
   (let [world (new-world)
-        surface [[-16 0] [-4 0] [0 -2] [4 0] [16 0]]
-        ground (with-pois
-                 (body! world {:type :static}
-                        {:shape (edge-chain surface)
-                         :friction 1})
-                 surface)
+        ground-pts [[-16 0] [-4 0] [0 -2] [4 0] [16 0]]
+        ground (simple-entity
+                ground-pts
+                (body! world {:type :static}
+                       {:shape (edge-chain ground-pts)
+                        :friction 1}))
         ceil-y 16
-        ceiling (body! world {:type :static}
-                       {:shape (edge [-16 ceil-y]
-                                     [16 ceil-y])})
+        ceiling (simple-entity
+                 [[-16 0] [16 0]]
+                 (body! world {:type :static
+                               :position [0 ceil-y]}
+                        {:shape (edge [-16 0] [16 0])}))
         stal-depth 6
         stal-yend 10
         stal-xoff 1
@@ -414,31 +433,32 @@
                     (v-interp [0 (- stal-depth)]
                               [(* sign stal-xoff) 0]
                               frac))
-        stalactite (with-pois
-                     (apply body! world {:type :static
-                                         :position [0 ceil-y]}
-                            {:shape (polygon [[stal-xoff 0]
-                                              [(- stal-xoff) 0]
-                                              [0 (- stal-depth)]])
-                             :friction 1}
-                            (for [pos stal-pois
-                                  :let [sign (if (neg? (first pos)) -1 1)]]
-                              {:shape (edge pos (v-add pos [(* sign 0.5) 0.1]))
-                               :friction 1}))
-                     stal-pois)
+        stalactite (simple-entity
+                    stal-pois
+                    (apply body! world {:type :static
+                                        :position [0 ceil-y]}
+                           {:shape (polygon [[stal-xoff 0]
+                                             [(- stal-xoff) 0]
+                                             [0 (- stal-depth)]])
+                            :friction 1}
+                           (for [pos stal-pois
+                                 :let [sign (if (neg? (first pos)) -1 1)]]
+                             {:shape (edge pos (v-add pos [(* sign 0.5) 0.1]))
+                              :friction 1})))
         rope-length 10
         swing-pois [[-2 0] [2 0]]
-        swing (with-pois
-                (body! world {:position [0 (- ceil-y rope-length)]}
-                       {:shape (box 2 0.1)
-                        :friction 1})
-                swing-pois)
+        swing (simple-entity
+               swing-pois
+               (body! world {:position [0 (- ceil-y rope-length)]}
+                      {:shape (box 2 0.1)
+                       :friction 1})
+               :entity-type :movable)
         ropes (doall
                (for [[x y] swing-pois]
                  (joint! {:type :rope
-                          :body-a ceiling
-                          :body-b swing
-                          :anchor-a [(* x 2) ceil-y]
+                          :body-a (ent/entity-body ceiling)
+                          :body-b (ent/entity-body swing)
+                          :anchor-a [(* x 2) 0]
                           :anchor-b [x y]
                           :max-length rope-length})))
         block-fx {:shape (box 2 1.5)
@@ -446,12 +466,12 @@
                   :friction 1}
         block-pois [[-2 1.5]
                     [2 1.5]]
-        blocks (for [[sign s] [[-1 "left"] [1 "right"]]]
-                 [(keyword (str "block-" s))
-                  (with-pois
-                    (body! world {:position [(* sign 13) 1.5]}
-                           block-fx)
-                    block-pois)])
+        blocks (for [[sign kw] [[-1 :block-left] [1 :block-right]]]
+                 [kw (simple-entity
+                      block-pois
+                      (body! world {:position [(* sign 13) 1.5]}
+                             block-fx)
+                      :entity-type :movable)])
         mini-fx {:shape (box 0.5 0.5)
                  :density 2
                  :friction 1}
@@ -459,35 +479,33 @@
                    [0.5 0.5]
                    [0.5 -0.5]
                    [-0.5 -0.5]]
-        minis (for [[sign s] [[-1 "left"] [1 "right"]]]
-                [(keyword (str "mini-" s))
-                 (with-pois
-                   (body! world {:position [(* sign 4.5) 0.5]}
-                          mini-fx)
-                   mini-pois)])
+        minis (for [[sign kw] [[-1 :mini-left] [1 :mini-right]]]
+                [kw (simple-entity
+                     mini-pois
+                     (body! world {:position [(* sign 4.5) 0.5]}
+                            mini-fx)
+                     :entity-type :movable)])
         plat-fx {:shape (edge [-2 0] [2 0])
                  :friction 1}
         plat-pois [[-2 0] [2 0]]
-        plats (for [[sign s] [[-1 "left"] [1 "right"]]]
-                [(keyword (str "plat-" s))
-                 (with-pois
-                   (body! world {:type :static
-                                 :position [(* sign 8) 6]}
-                          plat-fx)
-                   plat-pois)])
-        arena (map->Entity
-               {:entity-type :arena
-                :arena-type type
-                :components (into {:ground ground
-                                   :stalactite stalactite
-                                   :swing swing}
-                                  (concat blocks minis plats))})
+        plats (for [[sign kw] [[-1 :plat-left] [1 :plat-right]]]
+                [kw (simple-entity
+                     plat-pois
+                     (body! world {:type :static
+                                   :position [(* sign 8) 6]}
+                            plat-fx))])
+        entities (into {:ground ground
+                        :ceiling ceiling
+                        :stalactite stalactite
+                        :swing swing}
+                       (concat blocks minis plats))
         starting-pts (map vector [-10 10] (repeat 2.5))]
     (->
      (assoc empty-game
        :world world
-       :entities {:arena arena
-                  }
+       :game-type type
+       :game-version [0 0 1]
+       :entities entities
        :camera {:width 40 :height 20 :center [0 7]}
        :game-over-secs 60.0
        :check-end (fn [game]
@@ -507,25 +525,38 @@
 (defmethod build* :hunt
   [type players _]
   (let [world (new-world)
-        fence-pois [[-15 -7]
-                    [-15 7]
-                    [15 7]
-                    [15 -7]]
-        fence (with-pois
-                (body! world {:type :static
-                              :position [0 7]}
-                       {:shape (edge-loop fence-pois)
-                        :friction 1})
-                fence-pois)
+        east-x 15
+        west-x -15
+        ceil-y 14
+        ground (simple-entity
+                [[west-x 0] [east-x 0]]
+                (body! world {:type :static}
+                       {:shape (edge [west-x 0] [east-x 0])
+                        :friction 1.0}))
+        left-wall (simple-entity
+                   [[0 0] [0 ceil-y]]
+                   (body! world {:type :static
+                                 :position [west-x 0]}
+                          {:shape (edge [0 0] [0 ceil-y])}))
+        right-wall (simple-entity
+                    [[0 0] [0 ceil-y]]
+                    (body! world {:type :static
+                                  :position [east-x 0]}
+                           {:shape (edge [0 0] [0 ceil-y])}))
+        ceiling (simple-entity
+                 [[west-x 0] [east-x 0]]
+                 (body! world {:type :static
+                               :position [0 ceil-y]}
+                        {:shape (edge [west-x 0] [east-x 0])}))
         ;; -4m to left, 4.1m to right, 2.3m up
         pedestal-pts [[-4.0 0.0] [-2.5 0.2] [-2.0 0.5] [-2.1 1.1] [-1.9 1.8] [-1.5 2.0]
                       [4.0 2.3] [4.1 2.1] [3.5 1.7] [3.0 1.0] [3.1 0.7] [3.25 0.0]]
-        pedestal (with-pois
-                   (body! world {:type :static
-                                 :position [2 0]}
-                          {:shape (edge-chain pedestal-pts)
-                           :friction 1})
-                   pedestal-pts)
+        pedestal (simple-entity
+                  [[-2.0 0.5] [-1.5 2.0] [4.0 2.3] [3.25 0.0]]
+                  (body! world {:type :static
+                                :position [2 0]}
+                         {:shape (edge-chain pedestal-pts)
+                          :friction 1}))
         ;; 3m to left, 3.5m to right
         r-ramp-pts (into [[-3.0 0.0] [-2.0 1.0] [-1 0.9] [0.0 0.5]]
                          ;; steps continue ramp
@@ -533,90 +564,94 @@
                                      [0.0 1.0]
                                      (interpose [0.0 0.5]
                                                 (repeat 7 [0.5 0.0]))))
-        r-ramp (with-pois
-                 (body! world {:type :static
-                               :position [(- 15 3.5) 0]}
-                        {:shape (edge-chain r-ramp-pts)
-                         :friction 1})
-                 r-ramp-pts)
+        r-ramp (simple-entity
+                (take-nth 2 r-ramp-pts)
+                (body! world {:type :static
+                              :position [(- east-x 3.5) 0]}
+                       {:shape (edge-chain r-ramp-pts)
+                        :friction 1}))
         ;; 3m to left, 3m to right. 1.5m down, 1m up
         steps-pts (reductions v-add
                               [3 -1.5]
                               (interpose [0.0 0.5]
                                          (repeat 6 [-1.0 0.0])))
-        steps (with-pois
-                (body! world {:type :static
-                              :position [(- 15 7) 7]}
-                       {:shape (edge-chain steps-pts)
-                        :friction 1})
-                steps-pts)
+        steps (simple-entity
+               (concat (take-nth 2 steps-pts)
+                       (take-last 1 steps-pts))
+               (body! world {:type :static
+                             :position [(- east-x 7) 7]}
+                      {:shape (edge-chain steps-pts)
+                       :friction 1}))
         ;; 1m to left, 1.5m to right
         l-ramp-pts [[-1.0 1.2] [0.5 0.3] [1.5 0.0]]
-        l-ramp (with-pois
-                 (body! world {:type :static
-                               :position [(+ -15 1) 0]}
-                        {:shape (edge-chain l-ramp-pts)
-                         :friction 1})
-                 l-ramp-pts)
+        l-ramp (simple-entity
+                l-ramp-pts
+                (body! world {:type :static
+                              :position [(+ west-x 1) 0]}
+                       {:shape (edge-chain l-ramp-pts)
+                        :friction 1}))
         ;; 7m to left, 7m to right. 3m down, 2m up
         slope-pts [[-7 -3] [-6 -3] [-5 -2.5] [-4.2 -2.6] [-3 -2] [-2 -1.8]
                    [-1.6 -1.1] [-0.5 -0.9] [0 -1] [1 -0.7] [1.5 0.1] [2 0]
                    [2.1 0.5] [3 1] [5 1] [5.5 1.2] [6 2] [7 2]]
-        slope (with-pois
-                (body! world {:type :static
-                              :position [-5 6]}
-                       {:shape (edge-chain slope-pts)
-                        :friction 1})
-                slope-pts)
+        slope (simple-entity
+               (concat (take-nth 3 slope-pts)
+                       (take-last 1 slope-pts))
+               (body! world {:type :static
+                             :position [-5 6]}
+                      {:shape (edge-chain slope-pts)
+                       :friction 1}))
         ;; 3m to left, 3m to right
         plat-fx {:shape (edge [-3 0] [3 0])
                  :friction 1}
         plat-pois [[-3 0] [3 0]]
-        plat (with-pois
-               (body! world {:type :static
-                             :position [(+ -15 6) 10]}
-                      plat-fx)
-               plat-pois)
+        plat (simple-entity
+              plat-pois
+              (body! world {:type :static
+                            :position [(+ west-x 6) 10]}
+                     plat-fx))
         ;; 5m up, 0.5m right
         ladder-pois (for [y (range 0 5.01)]
                       [0.5 y])
-        ladder (with-pois
-                 (apply body! world {:type :static
-                                     :position [-15 5]}
-                        (for [poi ladder-pois]
-                          {:shape (edge poi (v-add poi [-0.5 -0.1]))
-                           :friction 1}))
-                 ladder-pois)
+        ladder (simple-entity
+                ladder-pois
+                (apply body! world {:type :static
+                                    :position [west-x 5]}
+                       (for [poi ladder-pois]
+                         {:shape (edge poi (v-add poi [-0.5 -0.1]))
+                          :friction 1})))
         ;; 1m down, 0.5m up
-        boulder-pois [[1.0 -0.4] [0.9 0.3] [0.1 0.5] [-0.6 0.4]
-                      [-0.9 -0.1] [-0.7 -0.8] [-0.2 -1.0] [0.6 -1.0]]
-        boulder-lo (with-pois
-                     (body! world {:position [3 3.5]}
-                            {:shape (polygon boulder-pois)
-                             :density 5
-                             :friction 1})
-                     boulder-pois)
-        boulder-hi (with-pois
-                     (body! world {:position [-1 8]
-                                   :angle Math/PI}
-                            {:shape (polygon boulder-pois)
-                             :density 5
-                             :friction 1})
-                     boulder-pois)
-        arena (map->Entity
-               {:entity-type :arena
-                :arena-type type
-                :components {:fence fence
-                             :pedestal pedestal
-                             :r-ramp r-ramp
-                             :steps steps
-                             :l-ramp l-ramp
-                             :slope slope
-                             :plat plat
-                             :ladder ladder
-                             :boulder-lo boulder-lo
-                             :boulder-hi boulder-hi}
-                })
+        boulder-pts [[1.0 -0.4] [0.9 0.3] [0.1 0.5] [-0.6 0.4]
+                     [-0.9 -0.1] [-0.7 -0.8] [-0.2 -1.0] [0.6 -1.0]]
+        boulder-pois (take-nth 2 (drop 1 boulder-pts))
+        boulder-lo (simple-entity
+                    boulder-pois
+                    (body! world {:position [3 3.5]}
+                           {:shape (polygon boulder-pts)
+                            :density 5
+                            :friction 1})
+                    :entity-type :movable)
+        boulder-hi (simple-entity
+                    boulder-pois
+                    (body! world {:position [-1 8]
+                                  :angle Math/PI}
+                           {:shape (polygon boulder-pts)
+                            :density 5
+                            :friction 1})
+                    :entity-type :movable)
+        entities {:ground ground
+                  :left-wall left-wall
+                  :right-wall right-wall
+                  :ceiling ceiling
+                  :pedestal pedestal
+                  :r-ramp r-ramp
+                  :steps steps
+                  :l-ramp l-ramp
+                  :slope slope
+                  :plat plat
+                  :ladder ladder
+                  :boulder-lo boulder-lo
+                  :boulder-hi boulder-hi}
         starting-pts [[-10 8] [10 8]]
         GUN_SPEED 1.0
         GUN_AMMO 50
@@ -625,8 +660,12 @@
     (->
      (assoc empty-game
        :world world
-       :entities {:arena arena}
-       :camera {:width 32 :height 16 :center [0 7]}
+       :game-type type
+       :game-version [0 0 1]
+       :entities entities
+       :camera {:width (+ (- east-x west-x) 2)
+                :height (+ ceil-y 2)
+                :center [0 (/ ceil-y 2)]}
        :player-gun (zipmap (keys players)
                            (repeat {:angle 0.0
                                     :ammo GUN_AMMO

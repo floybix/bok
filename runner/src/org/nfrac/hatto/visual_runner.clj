@@ -1,9 +1,10 @@
 (ns org.nfrac.hatto.visual-runner
   (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
+            [org.nfrac.hatto.entities :as ent]
             [org.nfrac.cljbox2d.core :refer [position center angle user-data
                                              body-a body-b anchor-a radius
                                              fixture-of vary-user-data]]
-            [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy]]
+            [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy v-scale]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
             [quil.middleware])
@@ -46,33 +47,45 @@
     (quil/fill 255)
     (quil/text-align :left)
     (quil/text (format "t = %.1f" (:time game))
-               10 (quil/height))
+               10 (- (quil/height) 5))
     (when (zero? (::detail-level game 0))
       (quil/text "Press d to show details." 10 10))
     (when (pos? (::detail-level game 0))
       (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
-                    mid-x (mean (map (comp first position)
-                                     (vals components)))
-                    top (apply max (map (comp second position)
-                                        (vals components)))
-                    [labx laby] (->px [mid-x (+ top 1)])]]
-        (quil/text-align :center :top)
-        (quil/text (name ent-key)
-                   labx laby)
+                    simple-ent? (== (count components) 1)
+                    [labx laby] (if simple-ent?
+                                  (->px (let [body (ent/entity-body ent)]
+                                          (if-let [pois (->> body
+                                                             (user-data)
+                                                             :points-of-interest
+                                                             (map #(position body %))
+                                                             (seq))]
+                                            (v-scale (reduce v-add pois)
+                                                     (/ (count pois)))
+                                            (center (ent/entity-body ent)))))
+                                  (->px (let [pts (map position (vals components))]
+                                          [(mean (map first pts))
+                                           (+ 1 (apply max (map second pts)))])))]]
         (when (== 1 (::detail-level game))
-          (quil/text-align :center :top)
+          (quil/text-align :center)
+          ;; label the entity
+          (quil/text (name ent-key)
+                     labx laby)
           (quil/stroke (quil/color 255 0 0))
           (doseq [[cmp-key body] components]
             (doseq [pt (:points-of-interest (user-data body))
                     :let [[x y] (->px (position body pt))]]
               (quil/ellipse x y 10 10))
-            (quil/with-translation (->px (center body))
-              (quil/with-rotation [(- (angle body))]
-                (quil/text (name cmp-key)
-                           0 0)))))
+            (when-not simple-ent?
+              ;; label the components
+              (quil/with-translation (->px (center body))
+                (quil/with-rotation [(- (angle body))]
+                  (quil/text (name cmp-key)
+                             0 0))))))
         (when (== 2 (::detail-level game))
           (quil/text-align :right :center)
+          ;; label the joints
           (doseq [[jt-key jt] joints
                   :let [anch (anchor-a jt)
                         body-a (body-a jt)
@@ -89,7 +102,8 @@
             (quil/with-translation (->px anch)
               (quil/with-rotation [(- 0 (angle body-b) 0.25)]
                 (quil/text (name jt-key)
-                           (* 0.95 radius-px) 0)))))))))
+                           (* 0.95 radius-px) 0))))
+          (quil/text-align :left :baseline))))))
 
 (defn key-press
   "Standard actions for key events"
