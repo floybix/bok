@@ -309,20 +309,37 @@
 (defmethod build* :energy-race
   [type players _]
   (let [world (new-world)
-        ground-pts (for [x (range -20 20.01 0.2)]
-                     [x (+ (* (Math/pow x 4)
-                              (/ (Math/pow 20 4))
-                              20.0)
-                           (* (Math/cos (* x 5))
-                              (/ (* x x) (* 20 20))
-                              1.5))])
-        ground-pois (for [z [0 1/3 2/3 1]]
-                      (nth ground-pts (* z (dec (count ground-pts)))))
+        surface-fn (fn [x]
+                     (+ (* (Math/pow x 4)
+                           (/ (Math/pow 20 4))
+                           20.0)
+                        (* (Math/cos (* x 5))
+                           (/ (* x x) (* 20 20))
+                           1.2)))
+        surface (for [x (range -21 21.01 0.2)]
+                  [x (surface-fn x)])
+        ;; split the surface into 3 smaller bodies, or too big for Box2d?
+        cliff-n (long (* 0.25 (dec (count surface))))
+        ground-n (- (count surface) (* 2 cliff-n))
+        [left-pts ground-pts right-pts] [(take (inc cliff-n) surface)
+                                         (take ground-n
+                                               (drop cliff-n surface))
+                                         (take-last (inc cliff-n) surface)]
         ground (simple-entity
-                ground-pois
+                [(first ground-pts) (last ground-pts)]
                 (body! world {:type :static}
                        {:shape (edge-chain ground-pts)
                         :friction 1}))
+        left-cliff (simple-entity
+                    [(first left-pts) (last left-pts)]
+                    (body! world {:type :static}
+                           {:shape (edge-chain left-pts)
+                            :friction 1}))
+        right-cliff (simple-entity
+                     [(first right-pts) (last right-pts)]
+                     (body! world {:type :static}
+                            {:shape (edge-chain right-pts)
+                             :friction 1}))
         plat-fx {:shape (edge [-5.5 0] [5.5 0])
                  :friction 1}
         plat-pois [[-5.5 0] [5.5 0]]
@@ -339,25 +356,28 @@
         ;; place food by scanning down from above at regular intervals
         food-pts (for [sign [-1 1]
                        xa (concat [2 4 6]
-                                  (range 10.4 20))
+                                  (range 10.4 20 1))
                        :let [x (* sign xa)]]
-                   (let [[rc] (raycast world [x 20] [x -10] :closest)]
-                     (if rc
-                       (v-add (:point rc) [0 0.2])
-                       (do (println (str "raycast missed: " x))
-                           [0 0]))))
-        food-fx {:shape (polygon [[0 0.5] [-0.25 0] [0.25 0]])
+                   (let [[rc] (raycast world [x 15] [x 13] :closest)
+                         pt (if rc (:point rc) [x (surface-fn x)])]
+                     (v-add pt [(- sign) 1.5])))
+        food-fx {:shape (polygon [[0 0.6] [-0.3 0] [0.3 0]])
                  :density 5 :restitution 0 :friction 1}
+        ;; set food to be floating (gravity-scale 0);
+        ;; we'll switch on gravity if it's touched later
         foods (map-indexed (fn [i pos]
                              (let [k (keyword (str "food-" i))]
                                [k (simple-entity
                                    [[0 0]]
                                    (body! world {:position pos
+                                                 :gravity-scale 0.0
                                                  :user-data {:food-joules 200.0}}
                                           food-fx)
                                    :entity-type :food)]))
                            food-pts)
         entities (into {:ground ground
+                        :left-cliff left-cliff
+                        :right-cliff right-cliff
                         :plat-left plat-left
                         :plat-right plat-right}
                        foods)
@@ -368,11 +388,18 @@
        :game-type type
        :game-version [0 0 1]
        :entities entities
-       :camera {:width 40 :height 20 :center [0 9]}
+       :camera {:width 40 :height 22 :center [0 10]}
        :player-energy (zipmap (keys players) (repeat 300.0))
        :game-over-secs 60.0
        :world-step
        (fn [game]
+         ;; if any food is touched, dislodge it - switch on its gravity
+         (doseq [cd (all-current-contacts world)
+                 fixt [(:fixture-a cd) (:fixture-b cd)]
+                 :let [body (body-of fixt)]]
+           (when (:food-joules (user-data body))
+             (gravity-scale! body 1.0)))
+         ;; do energy accounting
          (-> (reduce
               (fn [game player-key]
                 (let [me (get-in game [:entities player-key])
