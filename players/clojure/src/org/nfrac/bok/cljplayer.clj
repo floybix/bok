@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.cljplayer
+(ns org.nfrac.bok.cljplayer
   (:require [cognitect.transit :as transit])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))

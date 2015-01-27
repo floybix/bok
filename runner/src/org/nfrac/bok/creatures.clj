@@ -1,5 +1,5 @@
-(ns org.nfrac.hatto.creatures
-  (:require [org.nfrac.hatto.entities :refer [set-pois entity]]
+(ns org.nfrac.bok.creatures
+  (:require [org.nfrac.bok.entities :refer [set-pois entity]]
             [org.nfrac.cljbox2d.core :refer :all]
             [org.nfrac.cljbox2d.vec2d :refer [v-add]]))
 

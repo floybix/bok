@@ -1,6 +1,6 @@
-(ns org.nfrac.hatto.games
-  (:require [org.nfrac.hatto.entities :as ent :refer [simple-entity]]
-            [org.nfrac.hatto.creatures :as creatures]
+(ns org.nfrac.bok.games
+  (:require [org.nfrac.bok.entities :as ent :refer [simple-entity]]
+            [org.nfrac.bok.creatures :as creatures]
             [org.nfrac.cljbox2d.core :refer :all]
             [org.nfrac.cljbox2d.vec2d
              :refer [v-add v-sub polar-xy v-interp v-scale]]))

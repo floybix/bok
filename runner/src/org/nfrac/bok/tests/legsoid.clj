@@ -1,8 +1,8 @@
-(ns org.nfrac.hatto.tests.legsoid
-  (:require [org.nfrac.hatto.games :as games]
-            [org.nfrac.hatto.visual-runner :as visrun]
-            [org.nfrac.hatto.runner :as runner]
-            [org.nfrac.hatto.entities :as ent]
+(ns org.nfrac.bok.tests.legsoid
+  (:require [org.nfrac.bok.games :as games]
+            [org.nfrac.bok.visual-runner :as visrun]
+            [org.nfrac.bok.runner :as runner]
+            [org.nfrac.bok.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
 (defn a-action

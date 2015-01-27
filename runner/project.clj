@@ -1,8 +1,8 @@
-(defproject org.nfrac/hatto "0.1.0-SNAPSHOT"
-  :description "Run Hatto bouts either visually or in batch mode."
-  :url "https://github.com/floybix/hatto"
+(defproject org.nfrac/bok "0.1.0-SNAPSHOT"
+  :description "Run Bok bouts either visually or in batch mode."
+  :url "https://github.com/floybix/bok"
   :scm {:name "git"
-        :url "https://github.com/floybix/hatto"}
+        :url "https://github.com/floybix/bok"}
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.nfrac/cljbox2d "0.3.1-SNAPSHOT"]

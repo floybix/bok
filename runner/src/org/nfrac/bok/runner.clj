@@ -1,5 +1,5 @@
-(ns org.nfrac.hatto.runner
-  (:require [org.nfrac.hatto.games :as games]
+(ns org.nfrac.bok.runner
+  (:require [org.nfrac.bok.games :as games]
             [cognitect.transit :as transit])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))

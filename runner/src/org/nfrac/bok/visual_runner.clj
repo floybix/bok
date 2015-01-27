@@ -1,6 +1,6 @@
-(ns org.nfrac.hatto.visual-runner
-  (:require [org.nfrac.hatto.runner :as runner :refer [PLAYER_KEYS]]
-            [org.nfrac.hatto.entities :as ent]
+(ns org.nfrac.bok.visual-runner
+  (:require [org.nfrac.bok.runner :as runner :refer [PLAYER_KEYS]]
+            [org.nfrac.bok.entities :as ent]
             [org.nfrac.cljbox2d.core :refer [position center angle user-data
                                              body-a body-b anchor-a radius
                                              fixture-of vary-user-data]]
@@ -15,7 +15,7 @@
   (/ (reduce + xs)
      (count xs)))
 
-(defn hatto-draw
+(defn bok-draw
   [game]
   ;; if game over, highlight winner vs others
   (when-let [winner (:winner (:final-result game))]
@@ -142,13 +142,13 @@
   [game step]
   (let [p (promise)]
     (quil/sketch
-     :title "Hatto"
+     :title "Bok"
      :setup (fn []
               (quil/frame-rate 30)
               (merge bed/initial-state game))
      :update (fn [game]
                (gui-step game step))
-     :draw hatto-draw
+     :draw bok-draw
      :key-typed key-press
      :mouse-pressed bed/mouse-pressed
      :mouse-released bed/mouse-released

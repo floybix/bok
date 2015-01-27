@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.entities
+(ns org.nfrac.bok.entities
   (:require [org.nfrac.cljbox2d.core :refer :all]))
 
 (def ENTITY_TYPES #{:fixed :movable :food :creature})

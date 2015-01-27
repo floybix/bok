@@ -1,4 +1,4 @@
-(ns org.nfrac.hatto.cljplayer.util)
+(ns org.nfrac.bok.cljplayer.util)
 
 (def PI Math/PI)
 (def HALF_PI (/ PI 2))
