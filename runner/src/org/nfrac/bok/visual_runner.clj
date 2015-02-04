@@ -4,7 +4,8 @@
             [org.nfrac.cljbox2d.core :refer [position center angle user-data
                                              body-a body-b anchor-a radius
                                              fixture-of vary-user-data]]
-            [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy v-scale]]
+            [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy v-scale
+                                              v-angle v-mag]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
             [quil.middleware])
@@ -24,6 +25,7 @@
    :dynamic (quil/color 128 64 0)
    :joint (quil/color 64 0 64)
    :poi (quil/color 255 255 255)
+   :com (quil/color 0 255 0)
    :gun (quil/color 64 0 32)})
 
 (def winner-rgb [100 100 200])
@@ -81,10 +83,20 @@
                                             (center (ent/entity-body ent)))))
                                   (->px (let [pts (map position (vals components))]
                                           [(mean (map first pts))
-                                           (+ 1 (apply max (map second pts)))])))]]
+                                           (+ 1 (apply max (map second pts)))])))
+                    com (ent/entity-center-of-mass ent)
+                    comv (ent/entity-velocity ent)]]
         (when (== 1 (::detail-level game))
-          (quil/text-align :center)
+          ;; center of mass
+          (quil/stroke (:com colors))
+          (quil/with-translation (->px com)
+            (quil/with-rotation [(- (v-angle comv))]
+              (let [z (* px-scale (v-mag comv))]
+                (quil/line [0 0] [z 0])
+                (quil/line [z 0] [(- z 3) 2])
+                (quil/line [z 0] [(- z 3) -2]))))
           ;; label the entity
+          (quil/text-align :center)
           (quil/fill (:text colors))
           (quil/text (name ent-key)
                      labx laby)
@@ -130,6 +142,7 @@
   (case (:raw-key event)
     \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
                                                     (mod 3))))
+    \. (assoc state :stepping? true :paused true)
     \q (do
          (quil/exit)
          (assoc state :error "User quit."))
@@ -139,9 +152,11 @@
 
 (defn gui-step
   [game step]
-  (if (:paused? game)
+  (if (and (:paused? game)
+           (not (:stepping? game)))
     game
-    (let [game (step game)]
+    (let [game (-> (step game)
+                   (dissoc :stepping?))]
       (if-let [res (:final-result game)]
         ;; game has already ended
         (if (> (:time game)
@@ -163,7 +178,7 @@
     (quil/sketch
      :title "Bok"
      :setup (fn []
-              (quil/frame-rate 30)
+              (quil/frame-rate (/ (:dt-secs game)))
               (merge bed/initial-state game))
      :update (fn [game]
                (gui-step game step))
