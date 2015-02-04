@@ -5,18 +5,21 @@
             [org.nfrac.bok.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
+;; max torque
+(def MT 50.0)
+
 (defn a-action
   [info]
-  {:joints {:seg-1-rj 8
-            :seg-2-rj 0
-            :seg-5-rj 5}
+  {:joint-motors {:seg-1 [8 MT]
+                  :seg-2 [0 MT]
+                  :seg-5 [5 MT]}
    :gun {:fire true
          :speed 1}})
 
 (defn b-action
   [info]
-  {:joints {:seg-2-rj -10
-            :seg-3-rj -5}
+  {:joint-motors {:seg-2 [-10 MT]
+                  :seg-3 [-5 MT]}
    :gun {:fire true
          :speed 0.02}})
 

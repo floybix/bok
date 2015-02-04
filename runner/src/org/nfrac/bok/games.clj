@@ -39,8 +39,9 @@
 
 (defn act-on-joints
   [game player-key actions]
-  (ent/set-joint-motors! (get-in game [:entities player-key])
-                         (:joints actions))
+  (ent/apply-joint-actions! (get-in game [:entities player-key])
+                            (:joint-motors actions)
+                            (:joint-torques actions))
   game)
 
 (defn world-step
@@ -94,7 +95,7 @@
     :dead-players #{}
     :time 0.0
     :dt-secs (/ 1 30.0)
-    :dt-act-secs (/ 1 15.0)
+    :dt-act-secs (/ 1 30.0)
     :last-act-time 0.0
     ;; default method implementations
     :perceive perceive
@@ -103,8 +104,8 @@
     :check-end check-dead-or-time-limit}))
 
 (defn act-now?
-  [{:keys [time dt-act-secs last-act-time]}]
-  (>= time (+ dt-act-secs last-act-time)))
+  [game]
+  true)
 
 (defn add-players
   "Creates entities for each given player and adds them to the world
@@ -157,7 +158,7 @@
                 [[-15 0] [15 0]]
                 (body! world {:type :static}
                        {:shape (box 15 20 [0 -20])
-                        :friction 1.0}))
+                        :friction 1}))
         left-wall (simple-entity
                    [[0 0] [0 15]]
                    (body! world {:type :static
@@ -193,7 +194,7 @@
                 [[-15 0] [15 0]]
                 (body! world {:type :static}
                        {:shape (box 15 20 [0 -20])
-                        :friction 1.0}))
+                        :friction 1}))
         entities {:ground ground}
         starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
     (->
@@ -559,7 +560,7 @@
                 [[west-x 0] [east-x 0]]
                 (body! world {:type :static}
                        {:shape (edge [west-x 0] [east-x 0])
-                        :friction 1.0}))
+                        :friction 1}))
         left-wall (simple-entity
                    [[0 0] [0 ceil-y]]
                    (body! world {:type :static

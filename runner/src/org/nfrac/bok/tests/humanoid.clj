@@ -5,20 +5,29 @@
             [org.nfrac.bok.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
+;; max torque
+(def MT 100.0)
+
 (defn a-action
   [info]
-  {:joints {:arm-a1-rj -10
-            :arm-b1-rj -2
-            :leg-a2-rj 5
-            :leg-b2-rj 2
-            :pelvis-rj 0}})
+  {:joint-motors {:arm-a1 [-4 MT]
+                  :arm-b1 [-5 MT]
+                  :arm-a2 [0 MT]
+                  :arm-b2 [0 MT]
+                  :leg-a1 [0 MT]
+                  :leg-b1 [0 MT]
+                  :leg-a2 [-5 MT]
+                  :leg-b2 [-5 MT]
+                  }})
 
 (defn b-action
   [info]
-  {:joints {:arm-a1-rj 5
-            :arm-b1-rj 2
-            :leg-a2-rj 5
-            :leg-b2-rj 2}})
+  {:joint-motors {:arm-a1 [5 MT]
+                  :arm-b1 [-3 MT]
+                  :leg-a1 [5 MT]
+                  :leg-b1 [-3 MT]
+                  :leg-a2 [0 MT]
+                  :leg-b2 [0 MT]}})
 
 (defn -main
   "Run the test sketch."

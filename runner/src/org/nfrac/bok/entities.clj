@@ -1,5 +1,6 @@
 (ns org.nfrac.bok.entities
-  (:require [org.nfrac.cljbox2d.core :refer :all]))
+  (:require [org.nfrac.cljbox2d.core :refer :all]
+            [org.nfrac.cljbox2d.vec2d :refer [v-add v-scale]]))
 
 (def ENTITY_TYPES #{:fixed :movable :food :creature})
 
@@ -37,6 +38,32 @@
        (map mass)
        (reduce +)))
 
+(defn entity-center-of-mass
+  [entity]
+  (let [total-mass (entity-mass entity)]
+    (if (zero? total-mass)
+      (center (entity-body entity))
+      (->> entity
+           :components
+           vals
+           (map (fn [body]
+                  (v-scale (center body)
+                           (/ (mass body) total-mass))))
+           (reduce v-add)))))
+
+(defn entity-velocity
+  [entity]
+  (let [total-mass (entity-mass entity)]
+    (if (zero? total-mass)
+      (linear-velocity (entity-body entity))
+      (->> entity
+           :components
+           vals
+           (map (fn [body]
+                  (v-scale (linear-velocity body)
+                           (/ (mass body) total-mass))))
+           (reduce v-add)))))
+
 (defn entity-angular-velocity
   [entity]
   (let [total-mass (entity-mass entity)]
@@ -71,6 +98,7 @@
                (let [pois (:points-of-interest (user-data body))]
                  (assoc m k
                         {:angle (angle body)
+                         :ang-vel (angular-velocity body)
                          :points (for [poi pois]
                                    (point-state body poi))})))
              {}
@@ -91,13 +119,22 @@
   [entity inv-dt]
   {:components (observe-components entity)
    :joints (sense-joints entity inv-dt)
-   :angular-velocity (entity-angular-velocity entity)})
+   :center-of-mass (entity-center-of-mass entity)
+   :velocity (entity-velocity entity)
+   :ang-vel (entity-angular-velocity entity)})
 
-(defn set-joint-motors!
-  [entity joint-actions]
+(def MAX_TORQUE 200.0)
+
+(defn apply-joint-actions!
+  [entity motor-actions torque-actions]
   (doseq [[k jt] (:joints entity)]
-    (let [v (get joint-actions k)]
-      (do
-        (enable-motor! jt (boolean v))
-        (when v
-          (motor-speed! jt v))))))
+    (let [[sp mmt] (get motor-actions k)]
+      (enable-motor! jt (boolean sp))
+      (when sp
+        (motor-speed! jt sp)
+        (max-motor-torque! jt (-> mmt (min MAX_TORQUE)))))
+    (when-let [tq* (get torque-actions k)]
+      (let [tq (-> tq* (min MAX_TORQUE)
+                   (max (- MAX_TORQUE)))]
+        (apply-torque! (body-b jt) tq)
+        (apply-torque! (body-a jt) (- tq))))))
