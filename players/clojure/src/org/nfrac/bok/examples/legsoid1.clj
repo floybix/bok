@@ -1,13 +1,16 @@
 (ns org.nfrac.bok.examples.legsoid1
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [abs angle-left? angle-up? turn-towards HALF_PI]]))
+             :refer [abs angle-left? angle-up? HALF_PI turn-towards]]))
 
 (def ident {:creature-type :legsoid
             :name "Example legsoid1"
             :author "Felix Andrews <felix@nfrac.org>"
             :version "0.1.0-SNAPSHOT"
             :bok-version [0 1 0]})
+
+;; max torque
+(def MT 100.0)
 
 (def UP HALF_PI)
 (def DOWN (- HALF_PI))
@@ -19,8 +22,8 @@
   (let [{:keys [my-key entities]} (:current state)
         [opp-key] (keys (dissoc entities my-key :arena))
         me (get entities my-key)
-        my-head (:head (:components me))
-        eye (first (:points my-head))
+        {:keys [head leg-a1 leg-a2 leg-b1 leg-b2]} (:components me)
+        eye (first (:points head))
         opp (get entities opp-key)
         opp-head (:head (:components opp))
         opp-eye (first (:points opp-head))
@@ -29,20 +32,14 @@
         edge-fts (map #(util/point-features % eye)
                       (:points ground))
         opp-angle (:angle-from-me opp-ft)
-        dir (if (angle-left? opp-angle) 1 -1)
-        a1-angle (-> me :components :limb-a1 :angle)
-        b1-angle (-> me :components :limb-b1 :angle)
-        a2-angle (-> me :components :limb-a2 :angle)
-        b2-angle (-> me :components :limb-b2 :angle)
-        a1-sp (* 5 dir)
-        b1-sp (* 4 dir)
-        a2-sp (turn-towards DOWN a2-angle 40)
-        b2-sp (turn-towards DOWN b2-angle 40)
-        actions {:joints {:limb-a1-rj a1-sp
-                          :limb-b1-rj b1-sp
-                          :limb-a2-rj a2-sp
-                          :limb-b2-rj b2-sp
-                          }}]
+        dir (if (angle-left? opp-angle) -1 1)
+        actions
+        {:joint-motors
+         {:leg-a1 [(* -5 dir) MT]
+          :leg-b1 [(* -4 dir) MT]
+          :leg-a2 (turn-towards DOWN (:angle leg-a2) 0 30)
+          :leg-b2 (turn-towards DOWN (:angle leg-b2) 0 30)
+          }}]
     (assoc state
       :actions actions)))
 

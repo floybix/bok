@@ -6,6 +6,9 @@
 (defn abs [x] (if (neg? x) (- x) x))
 (defn sign [x] (if (neg? x) -1 1))
 
+(defn x-val [[x y]] x)
+(defn y-val [[x y]] y)
+
 (defn v-angle
   "Angle of a 2d geometric vector in radians in range -pi to pi."
   [[x y]]
@@ -33,6 +36,8 @@
 
 (defn angle-left? [a] (> (abs a) HALF_PI))
 
+(defn angle-right? [a] (not (angle-left? a)))
+
 (def angle-up? pos?)
 
 (defn angle-horiz?
@@ -41,21 +46,27 @@
       (> (abs a) (- Math/PI epsilon))))
 
 (defn turn-towards
-  "Returns a motor speed in radians per second (positive being
-   counter-clockwise, negative clockwise) to turn to `target-angle`
-   from the current angle `ang`. Speed is linear from a maximum of
-   `s-max` down to zero.
-
-   This assumes that the joints have been constructed so that the
-   joint angle is aligned with the given angle values (presumably
-   world angles)."
-  [target-angle ang s-max]
-  (let [ang-diff (loop [d (- target-angle ang)]
-                   (cond
-                    (> d PI) (recur (- d (* 2 PI)))
-                    (< d (- PI)) (recur (+ d (* 2 PI)))
-                    :else d))]
-    (* ang-diff s-max (/ PI))))
+  "Returns a joint control value (`[motor-speed max-torque]`) for
+   turning towards a target angle, given the current angle and angular
+   velocity. The motion is to be taken at the given `speed` but slows
+   within pi/8 of the target angle. The torque (limit) is calculated
+   as a Proportional Derivative controller: (`k_p` X `ang-diff`)
+   - (`k_d` X `ang-vel`)."
+  ([target-ang curr-ang ang-vel speed]
+     (turn-towards target-ang curr-ang ang-vel speed 100 10))
+  ([target-ang curr-ang ang-vel speed k_p k_d]
+     (let [ang-diff (loop [d (- target-ang curr-ang)]
+                      (cond
+                       (> d PI) (recur (- d (* 2 PI)))
+                       (< d (- PI)) (recur (+ d (* 2 PI)))
+                       :else d))
+           ;; reduce speed to zero near target angle
+           eps (/ PI 8)
+           sp (* speed (-> (/ ang-diff eps)
+                           (min 1.0)
+                           (max -1.0)))
+           tq (- (* k_p ang-diff) (* k_d ang-vel))]
+       [sp (abs tq)])))
 
 (defn point-features
   [point eye]
