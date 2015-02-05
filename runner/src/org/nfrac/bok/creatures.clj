@@ -4,7 +4,7 @@
             [org.nfrac.cljbox2d.vec2d :refer [v-add]]))
 
 (defmulti build
-  (fn [type world _ _]
+  (fn [type world position group-index]
     type))
 
 (defn revo-joint!
@@ -15,12 +15,14 @@
                  :world-anchor world-anchor}
                 more)))
 
+(def DOWN (* -0.5 Math/PI))
+
 (defn limb
   "Builds a limb of consecutive segments based on the `lengths` sequence.
    Each segment is attached with a revolute joint, and the first is
    likewise attached to `host` body. Returns keys :components
    and :joints, each a map with keywords made from `prefix` and a
-   number."
+   number. Joints are keyed by their outer component name."
   [world host position fixture-spec
    & {:keys [lengths width prefix]
       :or {lengths [0.75 0.75], width 0.1, prefix "seg-"}}]
@@ -32,13 +34,13 @@
                  (let [len (nth lengths i)
                        seg (-> (body! world {:position pos}
                                       (assoc fixture-spec
-                                        :shape (rod [0 0] 0 len width)))
-                               (set-pois [[len 0.0]]))
+                                        :shape (rod [0 0] DOWN len width)))
+                               (set-pois [[0.0 (- len)]]))
                        prev (or (:component (peek segs))
                                 host)
                        rj (revo-joint! prev seg pos)]
                    (recur (inc i)
-                          (v-add pos [(- len (/ width 2)) 0.0])
+                          (v-add pos [0.0 (- (- len (/ width 2)))])
                           (conj segs {:key (keyword (str prefix (inc i)))
                                       :component seg
                                       :joint rj})))))]
@@ -47,7 +49,8 @@
 
 (defmethod build :legsoid
   [type world position group-index]
-  (let [head (-> (body! world {:position position
+  (let [head-pos (v-add position [0 1.0])
+        head (-> (body! world {:position head-pos
                                :fixed-rotation true}
                         {:shape (circle 0.5)
                          :density 5
@@ -61,9 +64,9 @@
                    :group-index group-index}
         limbs (merge-with
                merge ;; merge nested maps
-               (limb world head position limb-spec
+               (limb world head head-pos limb-spec
                      :lengths [1.0 1.0] :prefix "leg-a")
-               (limb world head position limb-spec
+               (limb world head head-pos limb-spec
                      :lengths [1.0 1.0] :prefix "leg-b"))]
     (entity (assoc (:components limbs)
               :head head)
@@ -74,7 +77,7 @@
 
 (defmethod build :humanoid
   [type world position group-index]
-  (let [head-pos (v-add position [0 0.75])
+  (let [head-pos (v-add position [0 1.0])
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 5
@@ -82,7 +85,7 @@
                          :restitution 0
                          :group-index group-index})
                  (set-pois [[0 0]]))
-        torso-pos position
+        torso-pos (v-add head-pos [0 -0.75])
         torso-pts [[0.00 0.50]
                    [-0.25 0.25]
                    [-0.25 -0.25]
@@ -126,7 +129,7 @@
 
 (defmethod build :wormoid
   [type world position group-index]
-  (let [head-pos (v-add position [-2.5 0])
+  (let [head-pos (v-add position [0 2.5])
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 5

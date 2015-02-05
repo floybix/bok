@@ -5,7 +5,7 @@
                                              body-a body-b anchor-a radius
                                              fixture-of vary-user-data]]
             [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy v-scale
-                                              v-angle v-mag]]
+                                              v-sub v-angle v-mag]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
             [quil.middleware])
@@ -86,15 +86,16 @@
                                            (+ 1 (apply max (map second pts)))])))
                     com (ent/entity-center-of-mass ent)
                     comv (ent/entity-velocity ent)]]
-        (when (== 1 (::detail-level game))
+        (when (<= 1 (::detail-level game) 2)
           ;; center of mass
-          (quil/stroke (:com colors))
-          (quil/with-translation (->px com)
-            (quil/with-rotation [(- (v-angle comv))]
-              (let [z (* px-scale (v-mag comv))]
-                (quil/line [0 0] [z 0])
-                (quil/line [z 0] [(- z 3) 2])
-                (quil/line [z 0] [(- z 3) -2]))))
+          (when (== 2 (::detail-level game))
+            (quil/stroke (:com colors))
+            (quil/with-translation (->px com)
+              (quil/with-rotation [(- (v-angle comv))]
+                (let [z (* px-scale (v-mag comv))]
+                  (quil/line [0 0] [z 0])
+                  (quil/line [z 0] [(- z 3) 2])
+                  (quil/line [z 0] [(- z 3) -2])))))
           ;; label the entity
           (quil/text-align :center)
           (quil/fill (:text colors))
@@ -114,24 +115,24 @@
                 (quil/with-rotation [(- (angle body))]
                   (quil/text (name cmp-key)
                              0 0))))))
-        (when (== 2 (::detail-level game))
+        (when (== 3 (::detail-level game))
           (quil/text-align :right :center)
           ;; label the joints
           (doseq [[jt-key jt] joints
                   :let [anch (anchor-a jt)
                         body-a (body-a jt)
                         body-b (body-b jt)
-                        radius-px (* 2 px-scale (v-dist anch
-                                                        (center body-b)))]]
+                        ang (v-angle (v-sub (center body-b) anch))
+                        radius-px (* 2 px-scale (v-dist (center body-b) anch))]]
             (quil/stroke (:joint colors))
             (quil/fill (:joint colors) 64)
-            (apply quil/arc (concat (->px anch)
-                                    (repeat 2 (* 2 radius-px))
-                                    [(- 0 (angle body-b) 0.5)
-                                     (- (angle body-b))]))
+            (let [[x y] (->px anch)]
+              (quil/arc x y (* 2 radius-px) (* 2 radius-px)
+                        (- 0 ang 0.5)
+                        (- 0 ang)))
             (quil/fill (:text colors))
             (quil/with-translation (->px anch)
-              (quil/with-rotation [(- 0 (angle body-b) 0.25)]
+              (quil/with-rotation [(- 0 ang 0.25)]
                 (quil/text (name jt-key)
                            (* 0.95 radius-px) 0))))
           (quil/text-align :left :baseline))))))
@@ -141,7 +142,7 @@
   [state event]
   (case (:raw-key event)
     \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
-                                                    (mod 3))))
+                                                    (mod 4))))
     \. (assoc state :stepping? true :paused true)
     \q (do
          (quil/exit)
