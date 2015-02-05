@@ -1,7 +1,7 @@
 (ns org.nfrac.bok.examples.legsoid1
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [abs angle-left? angle-up? HALF_PI turn-towards]]))
+             :refer [abs angle-left? turn-towards]]))
 
 (def ident {:creature-type :legsoid
             :name "Example legsoid1"
@@ -11,11 +11,6 @@
 
 ;; max torque
 (def MT 100.0)
-
-(def UP HALF_PI)
-(def DOWN (- HALF_PI))
-(def LEFT Math/PI)
-(def RIGHT 0.0)
 
 (defn my-action-fn
   [state]
@@ -37,8 +32,8 @@
         {:joint-motors
          {:leg-a1 [(* -5 dir) MT]
           :leg-b1 [(* -4 dir) MT]
-          :leg-a2 (turn-towards DOWN (:angle leg-a2) 0 30)
-          :leg-b2 (turn-towards DOWN (:angle leg-b2) 0 30)
+          :leg-a2 (turn-towards 0 (:angle leg-a2) 0 30)
+          :leg-b2 (turn-towards 0 (:angle leg-b2) 0 30)
           }}]
     (assoc state
       :actions actions)))
