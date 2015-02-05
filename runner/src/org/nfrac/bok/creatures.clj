@@ -51,11 +51,13 @@
                                :fixed-rotation true}
                         {:shape (circle 0.5)
                          :density 5
-                         :friction 1.0
+                         :friction 1
+                         :restitution 0
                          :group-index group-index})
                  (set-pois [[0 0]]))
         limb-spec {:density 10
-                   :friction 1.0
+                   :friction 1
+                   :restitution 0
                    :group-index group-index}
         limbs (merge-with
                merge ;; merge nested maps
@@ -76,7 +78,8 @@
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 5
-                         :friction 1.0
+                         :friction 1
+                         :restitution 0
                          :group-index group-index})
                  (set-pois [[0 0]]))
         torso-pos position
@@ -91,13 +94,15 @@
         torso (-> (body! world {:position torso-pos}
                          {:shape (polygon torso-pts)
                           :density 5
-                          :friction 1.0
+                          :friction 1
+                          :restitution 0
                           :group-index group-index})
                   (set-pois torso-pois))
         wj (joint! {:type :weld :body-a head :body-b torso
                     :world-anchor head-pos})
         limb-spec {:density 20
-                   :friction 1.0
+                   :friction 1
+                   :restitution 0
                    :group-index group-index}
         arm-pos (v-add torso-pos [0.0 0.40])
         leg-pos (v-add torso-pos [0.0 -0.40])
@@ -125,11 +130,13 @@
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 5
-                         :friction 1.0
+                         :friction 1
+                         :restitution 0
                          :group-index group-index})
                  (set-pois [[0 0]]))
         limb-spec {:density 10
-                   :friction 1.0
+                   :friction 1
+                   :restitution 0
                    :group-index group-index}
         segs (limb world head head-pos limb-spec
                    :lengths (repeat 5 1.0) :prefix "seg-")]
