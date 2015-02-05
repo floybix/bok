@@ -55,11 +55,11 @@
   ([target-ang curr-ang ang-vel speed]
      (turn-towards target-ang curr-ang ang-vel speed 100 10))
   ([target-ang curr-ang ang-vel speed k_p k_d]
-     (let [ang-diff (loop [d (- target-ang curr-ang)]
-                      (cond
-                       (> d PI) (recur (- d (* 2 PI)))
-                       (< d (- PI)) (recur (+ d (* 2 PI)))
-                       :else d))
+     (let [d (- target-ang curr-ang)
+           ang-diff (cond
+                     (> d PI) (- d (* 2 PI))
+                     (< d (- PI)) (+ d (* 2 PI))
+                     :else d)
            ;; reduce speed to zero near target angle
            eps (/ PI 8)
            sp (* speed (-> (/ ang-diff eps)

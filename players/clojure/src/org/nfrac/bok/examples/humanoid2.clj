@@ -55,25 +55,31 @@
 
         legspan (->> [leg-a1 leg-a2 leg-a3 leg-b1 leg-b2 leg-b3]
                      (map x-offset))
-        balance? (< (apply min legspan)
-                    (- 0.15 (x-offset head))
-                    (+ 0.15 (x-offset head))
-                    (apply max legspan))
+        balance? (and (> (height head) (+ (height leg-a2) 1.5))
+                      (> (height head) (+ (height leg-b2) 1.5))
+                      (< (apply min legspan)
+                         (- 0.15 (x-offset head))
+                         (+ 0.15 (x-offset head))
+                         (apply max legspan)))
         react-arms {
                     :arm-a1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-a1) 8)
                     :arm-b1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-b1) 8)
-                    :arm-a2 (turn-towards 0 (:angle arm-a2) (:joint-speed arm-a2) 2)
-                    :arm-b2 (turn-towards 0 (:angle arm-b2) (:joint-speed arm-b2) 2)
+                    :arm-a2 (turn-towards 0 (:joint-angle arm-a2) (:joint-speed arm-a2) 6)
+                    :arm-b2 (turn-towards 0 (:joint-angle arm-b2) (:joint-speed arm-b2) 6)
                     }
 
+        ;; op 0 ==> stage 0, stance a, swing b
+        ;; op 1 ==> stage 1, stance a, swing b
+        ;; op 2 ==> stage 0, stance b, swing a
+        ;; op 3 ==> stage 1, stance b, swing a
         walk [{:dt 0.3
                :c-d 0.0
                :c-v 0.2
                ;; this      \|/ is torso angle (hip joint conversely)
                :stance-leg [0.05 -0.05 (+ HALF_PI 0.0)]
                :swing-leg [0.5 -1.1 (+ HALF_PI 0.2)]
-               :arm-a [-0.3 0.4]
-               :arm-b [0.3 0.4]
+               :stance-arm [0.3 0.4]
+               :swing-arm [-0.3 0.4]
                :leg-speed 8
                :arm-speed 2
                :arm-k-d 40
@@ -84,9 +90,9 @@
                :c-v 0.0
                ;; this      \|/ is torso angle (hip joint conversely)
                :stance-leg [0.05 -0.1 (+ HALF_PI 0.2)]
-               :swing-leg [-0.7 -1.1 (+ HALF_PI 0.0)]
-               :arm-a [0.3 0.4]
-               :arm-b [-0.3 0.4]
+               :swing-leg [-0.05 -0.1 (+ HALF_PI 0.0)]
+               :stance-arm [-0.3 0.4]
+               :swing-arm [0.3 0.4]
                :leg-speed 8
                :arm-speed 2
                :arm-k-d 40
@@ -103,22 +109,27 @@
                 swing (case stance :a :b, :b :a)
                 leg-cmps {:a [:leg-a1 :leg-a2 :leg-a3]
                           :b [:leg-b1 :leg-b2 :leg-b3]}
+                arm-cmps {:a [:arm-a1 :arm-a2]
+                          :b [:arm-b1 :arm-b2]}
                 ;; balance feedback to swing hip
                 swing-leg2 (get-in me [:components (get-in leg-cmps [swing 1])])
                 d (- (x-val com) (x-offset swing-leg2))
                 adj (+ (* (:c-d params) d)
-                       (* (:c-v params) comv))]
+                       (* (:c-v params) comv))
+                swing-leg1 (get-in me [:components (get-in leg-cmps [swing 0])])]
             (when-not (if (= :foot-contact (:dt params))
-                        (foot-grounded? swing)
+                        (or (foot-grounded? swing)
+                             ;; swing foot already behind
+                            (neg? (* dir (:angle swing-leg1))))
                         (>= time-in-op (:dt params)))
               (->>
-               (for [limb [:stance-leg :swing-leg :arm-a :arm-b]
+               (for [limb [:stance-leg :swing-leg :stance-arm :swing-arm]
                      :let [leg? (contains? #{:stance-leg :swing-leg} limb)
                            limb-ks (case limb
                                      :stance-leg (get leg-cmps stance)
                                      :swing-leg (get leg-cmps swing)
-                                     :arm-a [:arm-a1 :arm-a2]
-                                     :arm-b [:arm-b1 :arm-b2])]
+                                     :stance-arm (get arm-cmps stance)
+                                     :swing-arm (get arm-cmps swing))]
                      [i cmp-k theta] (map vector (range) limb-ks (get params limb))
                      :let [ang-vel (get-in me [:joints cmp-k :joint-speed])
                            curr-ang (cond
