@@ -1,7 +1,7 @@
 (ns org.nfrac.bok.examples.humanoid2
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [abs sign x-val y-val angle-left? angle-right? angle-up?
+             :refer [abs sign x-val y-val angle-left?
                      turn-towards v-angle v-sub HALF_PI]]))
 
 (def ident {:creature-type :humanoid
@@ -9,11 +9,6 @@
             :author "Felix Andrews <felix@nfrac.org>"
             :version "0.1.0-SNAPSHOT"
             :bok-version [0 1 0]})
-
-(def UP HALF_PI)
-(def DOWN (- HALF_PI))
-(def LEFT Math/PI)
-(def RIGHT 0.0)
 
 (defn height
   [component]
@@ -50,167 +45,124 @@
         opp-angle (:angle-from-me opp-ft)
         dir (if (angle-left? opp-angle) -1 1)
 
-        FOOT_FWD (* dir (/ Math/PI 2))
-        foot-a-grounded? (or (< (height leg-a2) 0.06)
-                             (< (height leg-a3) 0.06))
-        foot-b-grounded? (or (< (height leg-b2) 0.06)
-                             (< (height leg-b3) 0.06))
+        foot-grounded? {:a (or (< (height leg-a2) 0.06)
+                               (< (height leg-a3) 0.06))
+                        :b (or (< (height leg-b2) 0.06)
+                               (< (height leg-b3) 0.06))}
 
         com (:center-of-mass me)
         comv (/ (reduce + (map (comp x-val :velocity) (:points torso))) 2)
 
-        support (->> [leg-a2 leg-a3 leg-b2 leg-b3]
-                     (filter #(< (height %) 0.06))
-                     (map x-offset))
-        cos (if (seq support)
-              (midpoint support)
-              (x-val com))
-
         legspan (->> [leg-a1 leg-a2 leg-a3 leg-b1 leg-b2 leg-b3]
                      (map x-offset))
-        balance? (< (apply min legspan) (x-offset head) (apply max legspan))
+        balance? (< (apply min legspan)
+                    (- 0.15 (x-offset head))
+                    (+ 0.15 (x-offset head))
+                    (apply max legspan))
         react-arms {
-              :arm-a1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-a1) 8)
-              :arm-b1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-b1) 8)
-              :arm-a2 (turn-towards DOWN (:angle arm-a2) (:joint-speed arm-a2) 2)
-              :arm-b2 (turn-towards DOWN (:angle arm-b2) (:joint-speed arm-b2) 2)
-              }
+                    :arm-a1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-a1) 8)
+                    :arm-b1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-b1) 8)
+                    :arm-a2 (turn-towards 0 (:angle arm-a2) (:joint-speed arm-a2) 2)
+                    :arm-b2 (turn-towards 0 (:angle arm-b2) (:joint-speed arm-b2) 2)
+                    }
 
-        lsp 8
-        fsp 4
-        asp 2
-        akd 40
-        akv 4
+        walk [{:dt 0.3
+               :c-d 0.0
+               :c-v 0.2
+               ;; this      \|/ is torso angle (hip joint conversely)
+               :stance-leg [0.05 -0.05 (+ HALF_PI 0.0)]
+               :swing-leg [0.5 -1.1 (+ HALF_PI 0.2)]
+               :arm-a [-0.3 0.4]
+               :arm-b [0.3 0.4]
+               :leg-speed 8
+               :arm-speed 2
+               :arm-k-d 40
+               :arm-k-v 4
+               }
+              {:dt :foot-contact
+               :c-d 2.0
+               :c-v 0.0
+               ;; this      \|/ is torso angle (hip joint conversely)
+               :stance-leg [0.05 -0.1 (+ HALF_PI 0.2)]
+               :swing-leg [-0.7 -1.1 (+ HALF_PI 0.0)]
+               :arm-a [0.3 0.4]
+               :arm-b [-0.3 0.4]
+               :leg-speed 8
+               :arm-speed 2
+               :arm-k-d 40
+               :arm-k-v 4
+               }]
 
-        ;; finite state machine, each a function returning actions or
-        ;; nil to relinquish control
+        ;; finite state machine
+        ;; returns actions map, or nil to relinquish control of current op
 
-        fsm-ops
-        [ ;; 0 - begin leg a stance, leg b swing
-         (fn [time-in-state]
-           (when (< time-in-state 0.3)
-             (let [ ;; balance feedback to swing hip
-                   c_d 0.0
-                   c_v 0.2
-                   d (- (x-val com) (x-offset leg-a2))
-                   adj (+ (* c_d d) (* c_v comv))]
-               {:joint-motors
-                {
-                 ;; stance hip to balance torso upright (reverse joint)
-                 :leg-a1 (turn-towards 0 (- (:angle torso)) (:joint-speed leg-a1) lsp)
-                 :leg-a2 (turn-towards -0.05 (:joint-angle leg-a2) (:joint-speed leg-a2) lsp)
-                 :leg-a3 (turn-towards (+ FOOT_FWD 0.00) (:joint-angle leg-a3) (:joint-speed leg-a3) fsp)
-                 ;; swing leg
-                 :leg-b1 (turn-towards (+ DOWN 0.50 adj) (:angle leg-b1) (:joint-speed leg-b1) lsp)
-                 :leg-b2 (turn-towards -1.10 (:joint-angle leg-b2) (:joint-speed leg-b2) lsp)
-                 :leg-b3 (turn-towards (+ FOOT_FWD 0.20) (:joint-angle leg-b3) (:joint-speed leg-b3) fsp)
-                 ;; arms
-                 :arm-a1 (turn-towards (+ DOWN -0.30) (:joint-angle arm-a1) (:joint-speed arm-a1) asp akd akv)
-                 :arm-b1 (turn-towards (+ DOWN 0.30) (:joint-angle arm-b1) (:joint-speed arm-b1) asp akd akv)
-                 :arm-a2 (turn-towards 0.40 (:joint-angle arm-a2) (:joint-speed arm-a2) asp akd akv)
-                 :arm-b2 (turn-towards 0.40 (:joint-angle arm-b2) (:joint-speed arm-b2) asp akd akv)
-                 }})))
-         ;; 1 - complete leg a stance, leg b swing
-         (fn [time-in-state]
-           ;; until b foot strike
-           (when (and (not foot-b-grounded?)
-                      ;; swing leg still ahead
-                      (pos? (* dir (- (:angle leg-b1) DOWN))))
-             (let [ ;; balance feedback to swing hip
-                   c_d 2.0
-                   c_v 0.0
-                   d (- (x-val com) (x-offset leg-a2))
-                   adj (+ (* c_d d) (* c_v comv))]
-               {:joint-motors
-                {
-                 ;; stance hip to balance torso upright (reverse joint)
-                 :leg-a1 (turn-towards 0 (- (:angle torso)) (:joint-speed leg-a1) lsp)
-                 :leg-a2 (turn-towards -0.10 (:joint-angle leg-a2) (:joint-speed leg-a2) lsp)
-                 :leg-a3 (turn-towards (+ FOOT_FWD 0.20) (:joint-angle leg-a3) (:joint-speed leg-a3) fsp)
-                 ;; swing leg
-                 :leg-b1 (turn-towards (+ DOWN -0.70 adj) (:angle leg-b1) (:joint-speed leg-b1) lsp)
-                 :leg-b2 (turn-towards -0.05 (:joint-angle leg-b2) (:joint-speed leg-b2) lsp)
-                 :leg-b3 (turn-towards (+ FOOT_FWD 0.00) (:joint-angle leg-b3) (:joint-speed leg-b3) fsp)
-                 ;; arms
-                 :arm-a1 (turn-towards (+ DOWN 0.30) (:joint-angle arm-a1) (:joint-speed arm-a1) asp akd akv)
-                 :arm-b1 (turn-towards (+ DOWN -0.30) (:joint-angle arm-b1) (:joint-speed arm-b1) asp akd akv)
-                 :arm-a2 (turn-towards 0.40 (:joint-angle arm-a2) (:joint-speed arm-a2) asp akd akv)
-                 :arm-b2 (turn-towards 0.40 (:joint-angle arm-b2) (:joint-speed arm-b2) asp akd akv)
-                 }})))
-         ;; 2 - begin leg b stance, leg a swing
-         (fn [time-in-state]
-           (when (< time-in-state 0.3)
-             (let [ ;; balance feedback to swing hip
-                   c_d 0.0
-                   c_v 0.2
-                   d (- (x-val com) (x-offset leg-a2))
-                   adj (+ (* c_d d) (* c_v comv))]
-               {:joint-motors
-                {
-                 ;; swing leg
-                 :leg-a1 (turn-towards (+ DOWN 0.50 adj) (:angle leg-a1) (:joint-speed leg-a1) lsp)
-                 :leg-a2 (turn-towards -1.10 (:joint-angle leg-a2) (:joint-speed leg-a2) lsp)
-                 :leg-a3 (turn-towards (+ FOOT_FWD 0.20) (:joint-angle leg-a3) (:joint-speed leg-a3) fsp)
-                 ;; stance hip to balance torso upright (reverse joint)
-                 :leg-b1 (turn-towards 0 (- (:angle torso)) (:joint-speed leg-b1) lsp)
-                 :leg-b2 (turn-towards -0.05 (:joint-angle leg-b2) (:joint-speed leg-b2) lsp)
-                 :leg-b3 (turn-towards (+ FOOT_FWD 0.00) (:joint-angle leg-b3) (:joint-speed leg-b3) fsp)
-                 ;; arms
-                 :arm-a1 (turn-towards (+ DOWN 0.30) (:joint-angle arm-a1) (:joint-speed arm-a1) asp akd akv)
-                 :arm-b1 (turn-towards (+ DOWN -0.30) (:joint-angle arm-b1) (:joint-speed arm-b1) asp akd akv)
-                 :arm-a2 (turn-towards 0.40 (:joint-angle arm-a2) (:joint-speed arm-a2) asp akd akv)
-                 :arm-b2 (turn-towards 0.40 (:joint-angle arm-b2) (:joint-speed arm-b2) asp akd akv)
-                 }})))
-         ;; 3 - complete leg b stance, leg a swing
-         (fn [time-in-state]
-           ;; until a foot strike
-           (when (and (not foot-a-grounded?)
-                      ;; swing leg still ahead
-                      (pos? (* dir (- (:angle leg-a1) DOWN))))
-             (let [ ;; balance feedback to swing hip
-                   c_d 2.0
-                   c_v 0.0
-                   d (- (x-val com) (x-offset leg-b2))
-                   adj (+ (* c_d d) (* c_v comv))]
-               {:joint-motors
-                {
-                 ;; swing leg
-                 :leg-a1 (turn-towards (+ DOWN -0.70 adj) (:angle leg-a1) (:joint-speed leg-a1) lsp)
-                 :leg-a2 (turn-towards -0.05 (:joint-angle leg-a2) (:joint-speed leg-a2) lsp)
-                 :leg-a3 (turn-towards (+ FOOT_FWD 0.00) (:joint-angle leg-a3) (:joint-speed leg-a3) fsp)
-                 ;; stance hip to balance torso upright (reverse joint)
-                 :leg-b1 (turn-towards 0 (- (:angle torso)) (:joint-speed leg-b1) lsp)
-                 :leg-b2 (turn-towards -0.10 (:joint-angle leg-b2) (:joint-speed leg-b2) lsp)
-                 :leg-b3 (turn-towards (+ FOOT_FWD 0.20) (:joint-angle leg-b3) (:joint-speed leg-b3) fsp)
-                 ;; arms
-                 :arm-a1 (turn-towards (+ DOWN -0.30) (:joint-angle arm-a1) (:joint-speed arm-a1) asp akd akv)
-                 :arm-b1 (turn-towards (+ DOWN 0.30) (:joint-angle arm-b1) (:joint-speed arm-b1) asp akd akv)
-                 :arm-a2 (turn-towards 0.40 (:joint-angle arm-a2) (:joint-speed arm-a2) asp akd akv)
-                 :arm-b2 (turn-towards 0.40 (:joint-angle arm-b2) (:joint-speed arm-b2) asp akd akv)
-                 }})))
-         ]
+        symmetric-gait
+        (fn [stages current-op time-in-op]
+          (let [params (get stages (mod current-op (count stages)))
+                stance (if (< current-op (count stages)) :a :b)
+                swing (case stance :a :b, :b :a)
+                leg-cmps {:a [:leg-a1 :leg-a2 :leg-a3]
+                          :b [:leg-b1 :leg-b2 :leg-b3]}
+                ;; balance feedback to swing hip
+                swing-leg2 (get-in me [:components (get-in leg-cmps [swing 1])])
+                d (- (x-val com) (x-offset swing-leg2))
+                adj (+ (* (:c-d params) d)
+                       (* (:c-v params) comv))]
+            (when-not (if (= :foot-contact (:dt params))
+                        (foot-grounded? swing)
+                        (>= time-in-op (:dt params)))
+              (->>
+               (for [limb [:stance-leg :swing-leg :arm-a :arm-b]
+                     :let [leg? (contains? #{:stance-leg :swing-leg} limb)
+                           limb-ks (case limb
+                                     :stance-leg (get leg-cmps stance)
+                                     :swing-leg (get leg-cmps swing)
+                                     :arm-a [:arm-a1 :arm-a2]
+                                     :arm-b [:arm-b1 :arm-b2])]
+                     [i cmp-k theta] (map vector (range) limb-ks (get params limb))
+                     :let [ang-vel (get-in me [:joints cmp-k :joint-speed])
+                           curr-ang (cond
+                                     ;; swing hip an absolute angle
+                                     (and (= limb :swing-leg) (zero? i))
+                                     (get-in me [:components cmp-k :angle])
+                                     ;; stance hip to balance torso upright (reverse joint)
+                                     (and (= limb :stance-leg) (zero? i))
+                                     (- (get-in me [:components :torso :angle]))
+                                     ;; others in parent coordinates
+                                     :else
+                                     (get-in me [:joints cmp-k :joint-angle]))
+                           target-ang (+ (* dir theta)
+                                         ;; balance feedback to swing hip
+                                         (if (and (= limb :swing-leg) (zero? i))
+                                           adj
+                                           0))]]
+                 [cmp-k
+                  (if leg?
+                    (turn-towards target-ang curr-ang ang-vel (:leg-speed params))
+                    (turn-towards target-ang curr-ang ang-vel (:arm-speed params)
+                                  (:arm-k-d params) (:arm-k-v params)))])
+               (into {})
+               (hash-map :joint-motors)))))
+
         curr-op (:operator state 0)
         curr-elapsed (- (:time (:current state))
                         (:operator-start state 0))
         [next-op actions elapsed] (loop [op curr-op
                                          elapsed curr-elapsed]
-                                    (let [op-fn (get fsm-ops op)]
-                                      (if-let [actions* (op-fn elapsed)]
-                                        (let [actions (if balance?
-                                                        actions*
-                                                        (merge actions* react-arms))]
-                                          [op actions elapsed])
-                                        (recur (mod (inc op) (count fsm-ops))
-                                               0.0))))
+                                    (if-let [actions* (symmetric-gait walk op elapsed)]
+                                      (let [actions (if balance?
+                                                      actions*
+                                                      (merge actions* react-arms))]
+                                        [op actions elapsed])
+                                      (recur (mod (inc op) (* 2 (count walk)))
+                                             0.0)))
         ]
     (print (str next-op " "))
     (flush)
     (assoc state
       :actions actions
       :operator next-op
-      :operator-start (if (= curr-op next-op)
-                        (:operator-start state 0)
-                        (:time (:current state))))))
+      :operator-start (- (:time (:current state)) elapsed))))
 
 (defn main
   "For REPL use. Pass an `(atom {})` for peeking at the state."
