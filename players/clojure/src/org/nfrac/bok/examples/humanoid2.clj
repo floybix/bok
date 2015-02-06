@@ -28,12 +28,11 @@
 
 (defn my-action-fn
   [state]
-  (let [{:keys [my-key entities]} (:current state)
-        [opp-key] (keys (dissoc entities my-key :arena))
+  (let [{:keys [entities my-key other-players]} (:current state)
+        opp-key (first other-players)
         me (get entities my-key)
         ;; merge joint info into corresponding named components:
-        {:keys [head torso
-                arm-a1 arm-a2 arm-b1 arm-b2
+        {:keys [head torso arm-a1 arm-a2 arm-b1 arm-b2
                 leg-a1 leg-a2 leg-a3 leg-b1 leg-b2 leg-b3]}
         (merge-with merge ;; merge nested maps
                     (:components me)

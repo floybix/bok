@@ -36,6 +36,7 @@
                        (:entities game))]
     {:time (:time game)
      :my-key player-key
+     :other-players (disj (:player-keys game) player-key)
      :entities obs}))
 
 (defn act-on-joints

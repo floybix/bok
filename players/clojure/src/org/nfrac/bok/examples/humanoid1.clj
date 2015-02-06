@@ -14,11 +14,10 @@
 
 (defn my-action-fn
   [state]
-  (let [{:keys [my-key entities]} (:current state)
-        [opp-key] (keys (dissoc entities my-key :arena))
+  (let [{:keys [entities my-key other-players]} (:current state)
+        opp-key (first other-players)
         me (get entities my-key)
-        {:keys [head torso
-                arm-a1 arm-a2 arm-b1 arm-b2
+        {:keys [head torso arm-a1 arm-a2 arm-b1 arm-b2
                 leg-a1 leg-a2 leg-b1 leg-b2 leg-a3 leg-b3]} (:components me)
         eye (first (:points head))
         opp (get entities opp-key)

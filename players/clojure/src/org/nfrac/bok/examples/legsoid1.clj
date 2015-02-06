@@ -14,8 +14,8 @@
 
 (defn my-action-fn
   [state]
-  (let [{:keys [my-key entities]} (:current state)
-        [opp-key] (keys (dissoc entities my-key :arena))
+  (let [{:keys [entities my-key other-players]} (:current state)
+        opp-key (first other-players)
         me (get entities my-key)
         {:keys [head leg-a1 leg-a2 leg-b1 leg-b2]} (:components me)
         eye (first (:points head))
@@ -23,9 +23,6 @@
         opp-head (:head (:components opp))
         opp-eye (first (:points opp-head))
         opp-ft (util/point-features opp-eye eye)
-        ground (get-in entities [:arena :components :ground])
-        edge-fts (map #(util/point-features % eye)
-                      (:points ground))
         opp-angle (:angle-from-me opp-ft)
         dir (if (angle-left? opp-angle) -1 1)
         actions
