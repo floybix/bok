@@ -30,7 +30,8 @@
   (let [inv-dt (/ 1 (:dt-secs game))
         me (get-in game [:entities player-key])
         obs (reduce-kv (fn [m k ent]
-                         (assoc m k (ent/perceive-entity ent inv-dt)))
+                         (assoc m k (ent/perceive-entity ent inv-dt
+                                                         (= k player-key))))
                        {}
                        (:entities game))]
     {:time (:time game)
@@ -57,7 +58,7 @@
 
 (defn check-dead-or-time-limit
   [game]
-  (if (> (:time game) (:game-over-secs game Inf))
+  (if (>= (:time game) (:game-over-secs game Inf))
     {:winner nil}
     (let [{:keys [dead-players player-keys]} game]
       (if (>= (count dead-players)
@@ -66,7 +67,7 @@
 
 (defn check-highest
   [game]
-  (when (> (:time game) (:game-over-secs game Inf))
+  (when (>= (:time game) (:game-over-secs game Inf))
     (let [heights (->>
                    (map (fn [player-key]
                           (let [player (get-in game [:entities player-key])
@@ -81,7 +82,7 @@
 
 (defn check-max-energy
   [game]
-  (when (> (:time game) (:game-over-secs game Inf))
+  (when (>= (:time game) (:game-over-secs game Inf))
     (let [[winner energy] (apply max-key val (:player-energy game))]
       {:winner winner
        :energies (:player-energy game)})))
@@ -94,8 +95,8 @@
     :player-keys #{}
     :dead-players #{}
     :time 0.0
-    :dt-secs (/ 1 30.0)
-    :dt-act-secs (/ 1 30.0)
+    :dt-secs (/ 1 32.0)
+    :dt-act-secs (/ 1 32.0)
     :last-act-time 0.0
     ;; default method implementations
     :perceive perceive

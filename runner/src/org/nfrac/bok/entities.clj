@@ -18,7 +18,8 @@
                  :as attrs}]
   {:pre (ENTITY_TYPES entity-type)}
   (map->Entity (assoc attrs
-                 :components components)))
+                 :components components
+                 :entity-type entity-type)))
 
 (defn simple-entity
   [pois body & more-args]
@@ -49,7 +50,8 @@
            (map (fn [body]
                   (v-scale (center body)
                            (/ (mass body) total-mass))))
-           (reduce v-add)))))
+           (reduce v-add)
+           (mapv float)))))
 
 (defn entity-velocity
   [entity]
@@ -62,7 +64,8 @@
            (map (fn [body]
                   (v-scale (linear-velocity body)
                            (/ (mass body) total-mass))))
-           (reduce v-add)))))
+           (reduce v-add)
+           (mapv float)))))
 
 (defn entity-angular-velocity
   [entity]
@@ -75,7 +78,8 @@
            (map (fn [body]
                   (* (angular-velocity body)
                      (/ (mass body) total-mass))))
-           (reduce +)))))
+           (reduce +)
+           (float)))))
 
 (defn entity-work-joules
   [entity dt]
@@ -92,15 +96,29 @@
                 (position body poi)
                 (linear-velocity body poi)))
 
+(defn sense-contacts
+  [body]
+  (map (fn [cd]
+         (let [other (if (= body (body-of (:fixture-a cd)))
+                       (body-of (:fixture-b cd))
+                       (body-of (:fixture-a cd)))]
+           {:entity (:org.nfrac.bok.games/entity (user-data other))
+            :points (:points cd)
+            :normal (:normal cd)}))
+       (current-contacts body)))
+
 (defn observe-components
-  [entity]
+  [entity self?]
   (reduce-kv (fn [m k body]
-               (let [pois (:points-of-interest (user-data body))]
+               (let [pois (:points-of-interest (user-data body))
+                     info {:angle (angle body)
+                           :ang-vel (angular-velocity body)
+                           :points (for [poi pois]
+                                     (point-state body poi))}]
                  (assoc m k
-                        {:angle (angle body)
-                         :ang-vel (angular-velocity body)
-                         :points (for [poi pois]
-                                   (point-state body poi))})))
+                        (if-let [cs (and self? (seq (sense-contacts body)))]
+                          (assoc info :contacts cs)
+                          info))))
              {}
              (:components entity)))
 
@@ -116,8 +134,9 @@
              (:joints entity)))
 
 (defn perceive-entity
-  [entity inv-dt]
-  {:components (observe-components entity)
+  [entity inv-dt self?]
+  {:type (:entity-type entity)
+   :components (observe-components entity self?)
    :joints (sense-joints entity inv-dt)
    :center-of-mass (entity-center-of-mass entity)
    :velocity (entity-velocity entity)
