@@ -6,14 +6,14 @@
 (defn to-transit
   ^bytes [data]
   (let [out (ByteArrayOutputStream.)
-        writer (transit/writer out :json)]
+        writer (transit/writer out :msgpack)]
     (transit/write writer data)
     (.toByteArray out)))
 
 (defn from-transit
   [bytes]
   (let [in (ByteArrayInputStream. bytes)
-        reader (transit/reader in :json)]
+        reader (transit/reader in :msgpack)]
     (transit/read reader)))
 
 (defn recv-msg

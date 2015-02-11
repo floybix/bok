@@ -9,14 +9,14 @@
 (defn to-transit
   ^bytes [data]
   (let [out (ByteArrayOutputStream.)
-        writer (transit/writer out :json)]
+        writer (transit/writer out :msgpack)]
     (transit/write writer data)
     (.toByteArray out)))
 
 (defn from-transit
   [bytes]
   (let [in (ByteArrayInputStream. bytes)
-        reader (transit/reader in :json)]
+        reader (transit/reader in :msgpack)]
     (transit/read reader)))
 
 (defn recv-msg
@@ -81,10 +81,13 @@
                              :org.nfrac.bok.games/component)
                        core/user-data)]
     (-> (core/snapshot-scene (:world game) prev-scene true identify)
-        (merge (select-keys game [:player-keys
+        (merge (select-keys game [:game-type
+                                  :game-version
+                                  :idents
+                                  :player-keys
                                   :dead-players
                                   :final-result
-                                  :time
+                                  :dt-secs
                                   :player-energy
                                   :player-gun])))))
 
@@ -121,6 +124,8 @@
     {:error err}
     (let [check-end (:check-end game)]
       (when-let [result (check-end game)]
+        (println "total scene-deltas bytes:"
+                 (count (to-transit (:scene-deltas game))))
         (assoc result :end-time (:time game))))))
 
 (defn run-bout
