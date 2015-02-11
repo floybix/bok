@@ -26,48 +26,48 @@
    :joint (quil/color 64 0 64)
    :poi (quil/color 255 255 255)
    :com (quil/color 0 255 0)
-   :gun (quil/color 64 0 32)})
+   :gun (quil/color 64 0 32)
+   :winner (quil/color 100 100 200)
+   :loser (quil/color 32 32 32)})
 
-(def winner-rgb [100 100 200])
-(def loser-rgb [32 32 32])
-
-(defn bok-draw
-  [game]
-  ;; if game over, highlight winner vs others
-  (when-let [winner (:winner (:final-result game))]
-    (doseq [player-key (:player-keys game)
-            :let [rgb (if (= player-key winner)
-                        winner-rgb
-                        loser-rgb)
-                  ent (get-in game [:entities player-key])]]
-      (doseq [body (vals (:components ent))]
-        (vary-user-data body #(assoc % ::bed/rgb rgb)))))
-  (let [cam (:camera game)
-        ->px (bed/world-to-px-fn cam)
-        px-scale (bed/world-to-px-scale cam)
-        colors (colors*)]
-    ;; standard drawing
-    (bed/draw (assoc game ::bed/colors colors))
+(defn draw-additional
+  [scene camera colors]
+  (let [->px (bed/world-to-px-fn camera)
+        px-scale (bed/world-to-px-scale camera)]
     ;; guns
     (quil/stroke (:gun colors))
     (quil/stroke-weight 2)
-    (doseq [[player-key gun-info] (:player-gun game)
-            :let [head (get-in game [:entities player-key :components :head])
-                  gun-length (* 2 (radius (fixture-of head)))
+    (doseq [[player-key gun-info] (:player-gun scene)
+            :let [head (get-in scene [:bodies player-key :head])
+                  gun-length (* 2 (:radius (first (:fixtures head))))
                   gun-length-px (* px-scale gun-length)]]
-      (quil/with-translation (->px (position head))
+      (quil/with-translation (->px (:position head))
         (quil/with-rotation [(- (:angle gun-info))]
           (quil/line [0 2] [gun-length-px 2])
           (quil/line [0 -2] [gun-length-px -2]))))
     (quil/stroke-weight 1)
+    ;; if game over, highlight winner vs others
+    (when-let [winner (:winner (:final-result scene))]
+      (doseq [player-key (:player-keys scene)
+              :let [color (if (= player-key winner)
+                            (:winner colors)
+                            (:loser colors))
+                    bodies (vals (get-in scene [:bodies player-key]))]]
+        (quil/stroke 255)
+        (quil/fill color)
+        (doseq [body-snap bodies]
+          (bed/draw-body body-snap ->px px-scale))))))
+
+(defn draw-details
+  [game detail-level colors]
+  (let [camera (:camera game)
+        ->px (bed/world-to-px-fn camera)
+        px-scale (bed/world-to-px-scale camera)]
     ;; details, labels
     (quil/fill (:text colors))
-    (quil/text-align :left)
-    (quil/text (format "t = %.1f" (:time game))
-               10 (- (quil/height) 5))
-    (when (zero? (::detail-level game 0))
+    (when (zero? detail-level)
       (quil/text "Press d to show details." 10 10))
-    (when (pos? (::detail-level game 0))
+    (when (pos? detail-level)
       (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
                     simple-ent? (== (count components) 1)
@@ -137,27 +137,48 @@
                            (* 0.95 radius-px) 0))))
           (quil/text-align :left :baseline))))))
 
+(defn draw
+  [game]
+  (let [colors (colors*)]
+    ;; standard drawing
+    (bed/draw (assoc game ::bed/colors colors))
+    (let [{:keys [world snapshots steps-back time camera]} game
+          scene (nth snapshots steps-back nil)
+          detail-level (::detail-level game 0)]
+      (draw-additional scene camera colors)
+      (draw-details game detail-level colors))))
+
 (defn key-press
   "Standard actions for key events"
   [state event]
   (case (:raw-key event)
     \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
                                                     (mod 4))))
-    \. (assoc state :stepping? true :paused true)
     \q (do
          (quil/exit)
          (assoc state :error "User quit."))
     (bed/key-press state event)))
 
+(defn record-snapshot
+  [game]
+  (let [keep-n (:keep-snapshots game)
+        ;; runner has already instantiated the current scene
+        scene (:current-scene game)]
+    (cond-> (update-in game [:snapshots] conj scene)
+            ;; limit size of history buffer
+            (>= (count (:snapshots game)) keep-n)
+            (update-in [:snapshots] (partial take (* 0.9 keep-n))))))
+
 (def CONTINUE_SECS 4)
 
 (defn gui-step
   [game step]
-  (if (and (:paused? game)
-           (not (:stepping? game)))
+  (if (:paused? game)
     game
     (let [game (-> (step game)
-                   (dissoc :stepping?))]
+                   (record-snapshot)
+                   (assoc :stepping? false
+                          :paused? (:stepping? game)))]
       (if-let [res (:final-result game)]
         ;; game has already ended
         (if (> (:time game)
@@ -183,7 +204,7 @@
               (merge bed/initial-state game))
      :update (fn [game]
                (gui-step game step))
-     :draw bok-draw
+     :draw draw
      :key-typed key-press
      :mouse-pressed bed/mouse-pressed
      :mouse-released bed/mouse-released

@@ -9,6 +9,7 @@
                  [org.nfrac/cljbox2d.testbed "0.3.1-SNAPSHOT"]
                  [org.zeromq/jeromq "0.3.4"]
                  [com.cognitect/transit-clj "0.8.259"]
+                 [differ "0.2.1"]
                  [org.clojure/clojure "1.6.0"]]
   ;:jvm-opts ^:replace ["-server" "-XX:+UseConcMarkSweepGC"]
   )

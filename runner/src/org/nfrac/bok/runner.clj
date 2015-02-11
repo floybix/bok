@@ -1,6 +1,8 @@
 (ns org.nfrac.bok.runner
   (:require [org.nfrac.bok.games :as games]
-            [cognitect.transit :as transit])
+            [org.nfrac.cljbox2d.core :as core]
+            [cognitect.transit :as transit]
+            [differ.core :as differ])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
@@ -73,13 +75,35 @@
           (assoc :last-act-time (:time game))))
     game))
 
+(defn snapshot-scene
+  [game prev-scene]
+  (let [identify (comp (juxt :org.nfrac.bok.games/entity
+                             :org.nfrac.bok.games/component)
+                       core/user-data)]
+    (-> (core/snapshot-scene (:world game) prev-scene true identify)
+        (merge (select-keys game [:player-keys
+                                  :dead-players
+                                  :final-result
+                                  :time
+                                  :player-energy
+                                  :player-gun])))))
+
+(defn record-scene
+  [game]
+  (let [prev-scene (:current-scene game {})
+        new-scene (snapshot-scene game prev-scene)
+        scened (differ/diff prev-scene new-scene)]
+    (-> (update-in game [:scene-deltas] conj scened)
+        (assoc :current-scene new-scene))))
+
 (defn step-remote
   [game]
   (let [world-step (:world-step game)]
     (try
       (-> game
           (world-step)
-          (take-remote-actions))
+          (take-remote-actions)
+          (record-scene))
       (catch ZMQException e
         (assoc game :error e)))))
 
@@ -88,7 +112,8 @@
   (let [world-step (:world-step game)]
     (-> game
         (world-step)
-        (take-actions action-fns))))
+        (take-actions action-fns)
+        (record-scene))))
 
 (defn final-result
   [game]
