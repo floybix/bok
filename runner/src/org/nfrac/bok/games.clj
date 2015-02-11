@@ -97,17 +97,11 @@
     :dead-players #{}
     :time 0.0
     :dt-secs (/ 1 32.0)
-    :dt-act-secs (/ 1 32.0)
-    :last-act-time 0.0
     ;; default method implementations
     :perceive perceive
     :act act-on-joints
     :world-step world-step
     :check-end check-dead-or-time-limit}))
-
-(defn act-now?
-  [game]
-  true)
 
 (defn add-players
   "Creates entities for each given player and adds them to the world
@@ -730,7 +724,7 @@
                         (assoc-in [:player-gun player-key :reload-countdown]
                                   GUN_RELOAD)))
                   ;; otherwise, not firing gun
-                  (let [dt (:dt-act-secs game)
+                  (let [dt (:dt-secs game)
                         da (-> (:speed (:gun actions) 0)
                                (min GUN_SPEED)
                                (max (- GUN_SPEED))

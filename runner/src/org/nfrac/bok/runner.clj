@@ -38,42 +38,36 @@
   "Calls action functions (with perception data) looked up by player
    key in `action-fns`. For local testing only."
   [game action-fns]
-  (if (games/act-now? game)
-    (let [perceive (:perceive game)
-          act (:act game)
-          dead? (:dead-players game)]
-      (-> (reduce (fn [game [player-key action-fn]]
-                    (if (dead? player-key)
-                      (act game player-key {})
-                      (let [actions (action-fn (perceive game player-key))]
-                        (act game player-key actions))))
-                  game
-                  action-fns)
-          (assoc :last-act-time (:time game))))
-    game))
+  (let [perceive (:perceive game)
+        act (:act game)
+        dead? (:dead-players game)]
+    (reduce (fn [game [player-key action-fn]]
+              (if (dead? player-key)
+                (act game player-key {})
+                (let [actions (action-fn (perceive game player-key))]
+                  (act game player-key actions))))
+            game
+            action-fns)))
 
 (defn take-remote-actions
   [game]
-  (if (games/act-now? game)
-    (let [{:keys [perceive act player-keys bout-id sockets]} game
-          dead? (:dead-players game)]
-      (doseq [[player-key sock] sockets]
-        (if (dead? player-key)
-          () ;; send msg?
-          (let [ob (perceive game player-key)]
-            (send-msg sock {:type :react
-                            :bout-id bout-id
-                            :data ob}))))
-      (-> (reduce (fn [game [player-key sock]]
-                    (if (dead? player-key)
-                      (act game player-key {})
-                      (let [msg (recv-msg sock)
-                            actions (:data msg)]
-                        (act game player-key actions))))
-                  game
-                  sockets)
-          (assoc :last-act-time (:time game))))
-    game))
+  (let [{:keys [perceive act player-keys bout-id sockets]} game
+        dead? (:dead-players game)]
+    (doseq [[player-key sock] sockets]
+      (if (dead? player-key)
+        () ;; send msg?
+        (let [ob (perceive game player-key)]
+          (send-msg sock {:type :react
+                          :bout-id bout-id
+                          :data ob}))))
+    (reduce (fn [game [player-key sock]]
+              (if (dead? player-key)
+                (act game player-key {})
+                (let [msg (recv-msg sock)
+                      actions (:data msg)]
+                  (act game player-key actions))))
+            game
+            sockets)))
 
 (defn snapshot-scene
   [game prev-scene]
@@ -81,6 +75,7 @@
                              :org.nfrac.bok.games/component)
                        core/user-data)]
     (-> (core/snapshot-scene (:world game) prev-scene true identify)
+        (dissoc :joints)
         (merge (select-keys game [:game-type
                                   :game-version
                                   :idents
