@@ -37,6 +37,8 @@
     {:time (:time game)
      :my-key player-key
      :other-players (disj (:player-keys game) player-key)
+     :guns (:player-gun game)
+     :energy (:player-energy game)
      :entities obs}))
 
 (defn act-on-joints
@@ -86,7 +88,7 @@
   (when (>= (:time game) (:game-over-secs game Inf))
     (let [[winner energy] (apply max-key val (:player-energy game))]
       {:winner winner
-       :energies (:player-energy game)})))
+       :energy (:player-energy game)})))
 
 ;; =============================================================================
 
@@ -408,11 +410,6 @@
                       e-gain (if snack (:food-joules (user-data snack)) 0)
                       energy (+ (get-in game [:player-energy player-key])
                                 (- e-gain e-loss))]
-                  (vary-user-data head #(assoc % :org.nfrac.cljbox2d.testbed/rgb
-                                               [(-> energy (/ 2) (max 0) (min 255))
-                                                0
-                                                (- (-> energy (/ 2) (max 128) (min 255)) 128)
-                                                ]))
                   (when snack
                     (destroy! snack))
                   (-> (if snack
@@ -694,9 +691,6 @@
                            (repeat {:angle 0.0
                                     :ammo GUN_AMMO
                                     :reload-countdown GUN_RELOAD}))
-       :perceive (fn [game player-key]
-                   (assoc (perceive game player-key)
-                     :guns (:player-gun game)))
        :act (fn [game player-key actions]
               ;; process usual actions first
               (let [game (act-on-joints game player-key actions)

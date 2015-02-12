@@ -46,6 +46,19 @@
           (quil/line [0 2] [gun-length-px 2])
           (quil/line [0 -2] [gun-length-px -2]))))
     (quil/stroke-weight 1)
+    ;; energy
+    (doseq [[player-key energy] (:player-energy scene)
+            :let [head (get-in scene [:bodies player-key :head])
+                  r (:radius (first (:fixtures head)))
+                  r-px (* px-scale r)
+                  FULL 300.0]]
+      (quil/fill (quil/color (if (> energy FULL) (min 255 (- energy FULL)) 0)
+                             200
+                             (if (> energy FULL) (min 255 (- energy FULL)) 0))
+                 128)
+      (quil/with-translation (->px (:position head))
+        (quil/arc 0 0 (* r-px 2) (* r-px 2)
+                  0 (* 2 Math/PI (min FULL energy) (/ FULL)))))
     ;; if game over, highlight winner vs others
     (when-let [winner (:winner (:final-result scene))]
       (doseq [player-key (:player-keys scene)
@@ -57,6 +70,23 @@
         (quil/fill color)
         (doseq [body-snap bodies]
           (bed/draw-body body-snap ->px px-scale))))))
+
+(defn label-pt
+  [ent]
+  (let [components (:components ent)]
+    (if (== (count components) 1)
+      (let [body (ent/entity-body ent)]
+        (if-let [pois (->> body
+                           (user-data)
+                           :points-of-interest
+                           (map #(position body %))
+                           (seq))]
+          (v-scale (reduce v-add pois)
+                   (/ (count pois)))
+          (center (ent/entity-body ent))))
+      (let [pts (map position (vals components))]
+        [(mean (map first pts))
+         (+ 1 (apply max (map second pts)))]))))
 
 (defn draw-details
   [game detail-level colors]
@@ -71,43 +101,27 @@
       (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
                     simple-ent? (== (count components) 1)
-                    [labx laby] (if simple-ent?
-                                  (->px (let [body (ent/entity-body ent)]
-                                          (if-let [pois (->> body
-                                                             (user-data)
-                                                             :points-of-interest
-                                                             (map #(position body %))
-                                                             (seq))]
-                                            (v-scale (reduce v-add pois)
-                                                     (/ (count pois)))
-                                            (center (ent/entity-body ent)))))
-                                  (->px (let [pts (map position (vals components))]
-                                          [(mean (map first pts))
-                                           (+ 1 (apply max (map second pts)))])))
+                    [labx laby] (->px (label-pt ent))
                     com (ent/entity-center-of-mass ent)
                     comv (ent/entity-velocity ent)]]
-        (when (<= 1 (::detail-level game) 2)
-          ;; center of mass
-          (when (== 2 (::detail-level game))
-            (quil/stroke (:com colors))
-            (quil/with-translation (->px com)
-              (quil/with-rotation [(- (v-angle comv))]
-                (let [z (* px-scale (v-mag comv))]
-                  (quil/line [0 0] [z 0])
-                  (quil/line [z 0] [(- z 3) 2])
-                  (quil/line [z 0] [(- z 3) -2])))))
+        ;; when detail-level = 1, only label the players
+        (when (or (contains? (:player-keys game) ent-key)
+                  (> detail-level 1))
           ;; label the entity
           (quil/text-align :center)
           (quil/fill (:text colors))
           (quil/text (name ent-key)
-                     labx laby)
+                     labx laby))
+        ;; label all components and draw points of interest
+        (when (<= 2 detail-level 3)
           (doseq [[cmp-key body] components]
             ;; draw the points of interest
             (quil/stroke (:text colors))
             (quil/fill (:poi colors))
             (doseq [pt (:points-of-interest (user-data body))
-                    :let [[x y] (->px (position body pt))]]
-              (quil/ellipse x y 8 8))
+                    :let [[x y] (->px (position body pt))
+                          r-px (* px-scale 0.1)]]
+              (quil/ellipse x y r-px r-px))
             (when-not simple-ent?
               ;; label the components
               (quil/fill (:text colors))
@@ -115,7 +129,17 @@
                 (quil/with-rotation [(- (angle body))]
                   (quil/text (name cmp-key)
                              0 0))))))
-        (when (== 3 (::detail-level game))
+        ;; center of mass
+        (when (= 3 detail-level)
+          (quil/stroke (:com colors))
+          (quil/with-translation (->px com)
+            (quil/with-rotation [(- (v-angle comv))]
+              (let [z (* px-scale (v-mag comv))]
+                (quil/line [0 0] [z 0])
+                (quil/line [z 0] [(- z 3) 2])
+                (quil/line [z 0] [(- z 3) -2])))))
+        ;; joints
+        (when (= 4 detail-level)
           (quil/text-align :right :center)
           ;; label the joints
           (doseq [[jt-key jt] joints
@@ -153,7 +177,7 @@
   [state event]
   (case (:raw-key event)
     \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
-                                                    (mod 4))))
+                                                    (mod 5))))
     \q (do
          (quil/exit)
          (assoc state :error "User quit."))
