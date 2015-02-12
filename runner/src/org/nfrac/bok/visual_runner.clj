@@ -27,13 +27,25 @@
    :poi (quil/color 255 255 255)
    :com (quil/color 0 255 0)
    :gun (quil/color 64 0 32)
-   :winner (quil/color 100 100 200)
-   :loser (quil/color 32 32 32)})
+   :raycast (quil/color 100 100 100)
+   :winner (quil/color 180 180 180)
+   :loser (quil/color 64 64 64)})
 
 (defn draw-additional
   [scene camera colors]
   (let [->px (bed/world-to-px-fn camera)
         px-scale (bed/world-to-px-scale camera)]
+    ;; raycasts
+    (quil/stroke (:raycast colors) 128)
+    (doseq [[player-key rc] (:player-raycast scene)
+            :when rc
+            :let [head (get-in scene [:bodies player-key :head])
+                  rc-length-px (* px-scale (or (:distance rc) 100.0))]]
+      (quil/with-translation (->px (:position head))
+        (quil/with-rotation [(- (:angle rc))]
+          ;; dashed line
+          (doseq [i (range 0 (quot rc-length-px 8) 2)]
+            (quil/line [(* i 8) 0] [(* (inc i) 8) 0])))))
     ;; guns
     (quil/stroke (:gun colors))
     (quil/stroke-weight 2)
@@ -66,7 +78,7 @@
                             (:winner colors)
                             (:loser colors))
                     bodies (vals (get-in scene [:bodies player-key]))]]
-        (quil/stroke 255)
+        (quil/stroke 0)
         (quil/fill color)
         (doseq [body-snap bodies]
           (bed/draw-body body-snap ->px px-scale))))))
@@ -184,6 +196,7 @@
     (bed/key-press state event)))
 
 (defn record-snapshot
+  "Allows rewind"
   [game]
   (let [keep-n (:keep-snapshots game)
         ;; runner has already instantiated the current scene

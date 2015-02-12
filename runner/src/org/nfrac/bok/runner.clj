@@ -92,6 +92,7 @@
                                   :dead-players
                                   :final-result
                                   :dt-secs
+                                  :player-raycast
                                   :player-energy
                                   :player-gun])))))
 
