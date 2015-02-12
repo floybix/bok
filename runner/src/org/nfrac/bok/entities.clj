@@ -102,7 +102,7 @@
          (let [other (if (= body (body-of (:fixture-a cd)))
                        (body-of (:fixture-b cd))
                        (body-of (:fixture-a cd)))]
-           {:entity (:org.nfrac.bok.games/entity (user-data other))
+           {:entity (:org.nfrac.bok/entity (user-data other))
             :points (:points cd)
             :normal (:normal cd)}))
        (current-contacts body)))
@@ -132,6 +132,22 @@
                        :motor-torque (motor-torque jt inv-dt)}))
              {}
              (:joints entity)))
+
+(defn line-of-sight?
+  [world me my-id other other-id]
+  (let [eye (-> me :components :head position)
+        oth-eye (-> other :components :head position)
+        rc (first
+            (raycast world eye oth-eye :closest
+                     :ignore (fn [fixt]
+                               (let [id (-> fixt body-of user-data
+                                            :org.nfrac.bok/entity)]
+                                 ;; might be nil for extras, like bullets
+                                 (or (nil? id) (= id my-id))))))
+        hit-ent-id (-> rc :fixture body-of user-data :org.nfrac.bok/entity)]
+    (when-not hit-ent-id
+      (println "line-of-sight? raycast returned nothing:" rc))
+    (= other-id hit-ent-id)))
 
 (defn perceive-entity
   [entity inv-dt self?]

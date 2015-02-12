@@ -80,8 +80,8 @@
 
 (defn snapshot-scene
   [game prev-scene]
-  (let [identify (comp (juxt :org.nfrac.bok.games/entity
-                             :org.nfrac.bok.games/component)
+  (let [identify (comp (juxt :org.nfrac.bok/entity
+                             :org.nfrac.bok/component)
                        core/user-data)]
     (-> (core/snapshot-scene (:world game) prev-scene true identify)
         (dissoc :joints)

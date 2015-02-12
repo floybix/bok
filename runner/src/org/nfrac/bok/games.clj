@@ -29,14 +29,21 @@
   [game player-key]
   (let [inv-dt (/ 1 (:dt-secs game))
         me (get-in game [:entities player-key])
-        obs (reduce-kv (fn [m k ent]
-                         (assoc m k (ent/perceive-entity ent inv-dt
-                                                         (= k player-key))))
-                       {}
-                       (:entities game))]
+        other-players (disj (:player-keys game) player-key)
+        obs (->> (:entities game)
+                 (map (fn [[k ent]]
+                        ;; filter out perception of other players if out of sight
+                        (if (and (other-players k)
+                                 (not (ent/line-of-sight? (:world game) me
+                                                          player-key ent k)))
+                          nil
+                          ;; otherwise - normal perception
+                          [k (ent/perceive-entity ent inv-dt (= k player-key))])))
+                 (into {}))]
     {:time (:time game)
      :my-key player-key
-     :other-players (disj (:player-keys game) player-key)
+     :other-players other-players
+     :dead-players (:dead-players game)
      :guns (:player-gun game)
      :energy (:player-energy game)
      :entities obs}))
@@ -54,9 +61,6 @@
       (update-in [:world] step! (:dt-secs game))
       (update-in [:time] + (:dt-secs game))))
 
-;; =============================================================================
-;; ## check-end functions
-
 (def Inf Double/POSITIVE_INFINITY)
 
 (defn check-dead-or-time-limit
@@ -67,28 +71,6 @@
       (if (>= (count dead-players)
               (dec (count player-keys)))
         {:winner (first (remove dead-players player-keys))}))))
-
-(defn check-highest
-  [game]
-  (when (>= (:time game) (:game-over-secs game Inf))
-    (let [heights (->>
-                   (map (fn [player-key]
-                          (let [player (get-in game [:entities player-key])
-                                head (-> player :components :head)
-                                [x y] (position head)]
-                            [player-key y]))
-                        (:player-keys game))
-                   (into {}))
-          highest (apply max-key heights (:player-keys game))]
-      {:winner highest
-       :heights heights})))
-
-(defn check-max-energy
-  [game]
-  (when (>= (:time game) (:game-over-secs game Inf))
-    (let [[winner energy] (apply max-key val (:player-energy game))]
-      {:winner winner
-       :energy (:player-energy game)})))
 
 ;; =============================================================================
 
@@ -135,13 +117,14 @@
 
 (defn build
   "Returns a Game record where all Body objects have their entity and
-   components keys attached in user-data ::entity and ::component."
+   components keys attached in user-data `:org.nfrac.bok/entity`
+   and `:org.nfrac.bok/component`."
   [type players opts]
   (let [game (build* type players opts)]
     (doseq [[ent-k ent] (:entities game)
             [cmp-k cmp] (:components ent)]
-      (vary-user-data cmp #(assoc % ::entity ent-k
-                                  ::component cmp-k)))
+      (vary-user-data cmp #(assoc % :org.nfrac.bok/entity ent-k
+                                  :org.nfrac.bok/component cmp-k)))
     game))
 
 ;; =============================================================================
@@ -185,6 +168,20 @@
 ;; Just a flat ground/platform, aim is to push opponent off. Times out
 ;; after 60s.
 
+(defn sumo-step
+  [game death-level]
+  (let [game (world-step game)
+        dead (filter (fn [player-key]
+                       (let [player (get-in game [:entities player-key])
+                             head (-> player :components :head)
+                             [x y] (position head)]
+                         ;; head has fallen below death level
+                         (< y death-level)))
+                     (:player-keys game))]
+    (if (seq dead)
+      (update-in game [:dead-players] into dead)
+      game)))
+
 (defmethod build* :sumo
   [type players _]
   (let [world (new-world)
@@ -203,20 +200,8 @@
        :entities entities
        :camera {:width 40 :height 20 :center [0 5]}
        :game-over-secs 60.0
-       :world-step
-       (fn [game]
-         (let [game (world-step game)
-               Y_DEAD -2
-               dead (filter (fn [player-key]
-                              (let [player (get-in game [:entities player-key])
-                                    head (-> player :components :head)
-                                    [x y] (position head)]
-                                ;; head has fallen below death level
-                                (< y Y_DEAD)))
-                            (:player-keys game))]
-           (if (seq dead)
-             (update-in game [:dead-players] into dead)
-             game))))
+       :world-step (fn [game]
+                     (sumo-step -2)))
      (add-players players starting-pts))))
 
 ;; =============================================================================
@@ -305,6 +290,44 @@
 ;; and gain energy. Moving joints uses energy. Arena is a x^4 curve
 ;; with a sine wave mixed in for foot-holds. Also two high platforms.
 
+(defn check-max-energy
+  [game]
+  (when (>= (:time game) (:game-over-secs game Inf))
+    (let [[winner energy] (apply max-key val (:player-energy game))]
+      {:winner winner
+       :energy (:player-energy game)})))
+
+(defn energy-race-step
+  [game]
+  (let [world (:world game)]
+    ;; if any food is touched, dislodge it - switch on its gravity
+   (doseq [cd (all-current-contacts world)
+           fixt [(:fixture-a cd) (:fixture-b cd)]
+           :let [body (body-of fixt)]]
+     (when (:food-joules (user-data body))
+       (gravity-scale! body 1.0)))
+   ;; do energy accounting
+   (-> (reduce
+        (fn [game player-key]
+          (let [me (get-in game [:entities player-key])
+                e-loss (ent/entity-work-joules me (:dt-secs game))
+                head (get-in me [:components :head])
+                snack (first (filter (comp :food-joules user-data)
+                                     (contacting head)))
+                snack-k (when snack (:org.nfrac.bok/entity (user-data snack)))
+                e-gain (if snack (:food-joules (user-data snack)) 0)
+                energy (+ (get-in game [:player-energy player-key])
+                          (- e-gain e-loss))]
+            (when snack
+              (destroy! snack))
+            (-> (if snack
+                  (update-in game [:entities] dissoc snack-k)
+                  game)
+                (update-in [:player-energy] assoc player-key energy))))
+        game
+        (:player-keys game))
+       (world-step))))
+
 (defmethod build* :energy-race
   [type players _]
   (let [world (new-world)
@@ -390,37 +413,8 @@
        :camera {:width 40 :height 22 :center [0 10]}
        :player-energy (zipmap (keys players) (repeat 300.0))
        :game-over-secs 60.0
-       :world-step
-       (fn [game]
-         ;; if any food is touched, dislodge it - switch on its gravity
-         (doseq [cd (all-current-contacts world)
-                 fixt [(:fixture-a cd) (:fixture-b cd)]
-                 :let [body (body-of fixt)]]
-           (when (:food-joules (user-data body))
-             (gravity-scale! body 1.0)))
-         ;; do energy accounting
-         (-> (reduce
-              (fn [game player-key]
-                (let [me (get-in game [:entities player-key])
-                      e-loss (ent/entity-work-joules me (:dt-secs game))
-                      head (get-in me [:components :head])
-                      snack (first (filter (comp :food-joules user-data)
-                                           (contacting head)))
-                      snack-k (when snack (::entity (user-data snack)))
-                      e-gain (if snack (:food-joules (user-data snack)) 0)
-                      energy (+ (get-in game [:player-energy player-key])
-                                (- e-gain e-loss))]
-                  (when snack
-                    (destroy! snack))
-                  (-> (if snack
-                        (update-in game [:entities] dissoc snack-k)
-                        game)
-                      (update-in [:player-energy] assoc player-key energy))))
-              game
-              (:player-keys game))
-             (world-step)))
-       :check-end (fn [game]
-                    (check-max-energy game)))
+       :world-step energy-race-step
+       :check-end check-max-energy)
      (add-players players starting-pts))))
 
 ;; =============================================================================
@@ -430,6 +424,21 @@
 ;; time limit is reached. Arena has large and small blocks, two
 ;; platforms, a central swing (on rope joints) and a stalactite with
 ;; hand-holds.
+
+(defn check-highest
+  [game]
+  (when (>= (:time game) (:game-over-secs game Inf))
+    (let [heights (->>
+                   (map (fn [player-key]
+                          (let [player (get-in game [:entities player-key])
+                                head (-> player :components :head)
+                                [x y] (position head)]
+                            [player-key y]))
+                        (:player-keys game))
+                   (into {}))
+          highest (apply max-key heights (:player-keys game))]
+      {:winner highest
+       :heights heights})))
 
 (defmethod build* :altitude
   [type players _]
@@ -529,8 +538,7 @@
        :entities entities
        :camera {:width 40 :height 20 :center [0 7]}
        :game-over-secs 60.0
-       :check-end (fn [game]
-                    (check-highest game)))
+       :check-end check-highest)
      (add-players players starting-pts))))
 
 ;; =============================================================================
@@ -542,6 +550,75 @@
 ;; rotate the gun and to fire the gun. There is a maximum speed at
 ;; which the gun can be rotated, so it can take several time steps to
 ;; aim it.
+
+(def GUN_SPEED 1.0)
+(def GUN_AMMO 50)
+(def GUN_RELOAD 2) ;; seconds
+
+(defn hunt-act
+  [game player-key actions]
+  ;; process usual actions first
+  (let [game (act-on-joints game player-key actions)
+        world (:world game)
+        gun-info (get-in game [:player-gun player-key])
+        ang (:angle gun-info)]
+    (if (and (:fire (:gun actions))
+             (zero? (:reload-countdown gun-info))
+             (pos? (:ammo gun-info)))
+      ;; fire gun
+      (let [head (get-in game [:entities player-key :components :head])
+            group-index (get-in game [:entities player-key :group-index])
+            bullet (body! world {:position (v-add (position head)
+                                                  (polar-xy 0.5 ang))
+                                 :angle ang
+                                 :bullet true}
+                          {:shape (box 0.2 0.05)
+                           :density 20
+                           :group-index group-index
+                           :user-data {::bullet-of player-key}})
+            impulse (polar-xy 25 ang)]
+        (apply-impulse! bullet impulse (center bullet))
+        (apply-impulse! head (v-scale impulse -1) (center head))
+        (-> game
+            (update-in [:player-gun player-key :ammo] dec)
+            (assoc-in [:player-gun player-key :reload-countdown]
+                      GUN_RELOAD)))
+      ;; otherwise, not firing gun
+      (let [dt (:dt-secs game)
+            da (-> (:speed (:gun actions) 0)
+                   (min GUN_SPEED)
+                   (max (- GUN_SPEED))
+                   (* dt))]
+        (-> game
+            (update-in [:player-gun player-key :angle] + da)
+            (update-in [:player-gun player-key :reload-countdown]
+                       #(max 0 (- % dt))))))))
+
+(defn hunt-step
+  [game]
+  ;; do standard step first:
+  (let [game (world-step game)
+        contacts (:buffered-contacts game)
+        hits (keep (fn [{:keys [fixture-a fixture-b]}]
+                     (cond
+                      (::bullet-of (user-data fixture-a))
+                      [fixture-a fixture-b]
+                      (::bullet-of (user-data fixture-b))
+                      [fixture-b fixture-a]))
+                   @contacts)
+        dead (distinct
+              (keep (fn [[_ target-fixt]]
+                      (->> (body-of target-fixt)
+                           (user-data)
+                           :org.nfrac.bok/entity
+                           (get (:player-keys game))))
+                    hits))]
+    (doseq [[bullet-fixt _] hits]
+      (destroy! (body-of bullet-fixt)))
+    (swap! contacts empty)
+    (if (seq dead)
+      (update-in game [:dead-players] into dead)
+      game)))
 
 (defmethod build* :hunt
   [type players _]
@@ -673,11 +750,7 @@
                   :ladder ladder
                   :boulder-lo boulder-lo
                   :boulder-hi boulder-hi}
-        starting-pts [[-10 8] [10 8]]
-        GUN_SPEED 1.0
-        GUN_AMMO 50
-        GUN_RELOAD 2 ;; seconds
-        contacts (set-buffering-contact-listener! world)]
+        starting-pts [[-10 8] [10 8]]]
     (->
      (assoc empty-game
        :world world
@@ -691,63 +764,7 @@
                            (repeat {:angle 0.0
                                     :ammo GUN_AMMO
                                     :reload-countdown GUN_RELOAD}))
-       :act (fn [game player-key actions]
-              ;; process usual actions first
-              (let [game (act-on-joints game player-key actions)
-                    gun-info (get-in game [:player-gun player-key])
-                    ang (:angle gun-info)]
-                (if (and (:fire (:gun actions))
-                         (zero? (:reload-countdown gun-info))
-                         (pos? (:ammo gun-info)))
-                  ;; fire gun
-                  (let [head (get-in game [:entities player-key :components :head])
-                        group-index (get-in game [:entities player-key :group-index])
-                        bullet (body! world {:position (v-add (position head)
-                                                              (polar-xy 0.5 ang))
-                                             :angle ang
-                                             :bullet true}
-                                      {:shape (box 0.2 0.05)
-                                       :density 20
-                                       :group-index group-index
-                                       :user-data {::bullet-of player-key}})
-                        impulse (polar-xy 25 ang)]
-                    (apply-impulse! bullet impulse (center bullet))
-                    (apply-impulse! head (v-scale impulse -1) (center head))
-                    (-> game
-                        (update-in [:player-gun player-key :ammo] dec)
-                        (assoc-in [:player-gun player-key :reload-countdown]
-                                  GUN_RELOAD)))
-                  ;; otherwise, not firing gun
-                  (let [dt (:dt-secs game)
-                        da (-> (:speed (:gun actions) 0)
-                               (min GUN_SPEED)
-                               (max (- GUN_SPEED))
-                               (* dt))]
-                    (-> game
-                        (update-in [:player-gun player-key :angle] + da)
-                        (update-in [:player-gun player-key :reload-countdown]
-                                   #(max 0 (- % dt))))))))
-       :world-step (fn [game]
-                     ;; do standard step first:
-                     (let [game (world-step game)
-                           hits (keep (fn [{:keys [fixture-a fixture-b]}]
-                                        (cond
-                                         (::bullet-of (user-data fixture-a))
-                                         [fixture-a fixture-b]
-                                         (::bullet-of (user-data fixture-b))
-                                         [fixture-b fixture-a]))
-                                      @contacts)
-                           dead (distinct
-                                 (keep (fn [[_ target-fixt]]
-                                         (->> (body-of target-fixt)
-                                              (user-data)
-                                              ::entity
-                                              (get (:player-keys game))))
-                                       hits))]
-                       (doseq [[bullet-fixt _] hits]
-                         (destroy! (body-of bullet-fixt)))
-                       (swap! contacts empty)
-                       (if (seq dead)
-                         (update-in game [:dead-players] into dead)
-                         game))))
+       :buffered-contacts (set-buffering-contact-listener! world)
+       :act hunt-act
+       :world-step hunt-step)
      (add-players players starting-pts))))
