@@ -1,7 +1,7 @@
 (ns org.nfrac.bok.examples.bipoid1
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [abs angle-left? turn-towards]]))
+             :refer [x-val y-val abs turn-towards]]))
 
 (def ident {:creature-type :bipoid
             :name "Example bipoid1"
@@ -22,9 +22,8 @@
         opp (get entities opp-key)
         opp-head (:head (:components opp))
         opp-eye (first (:points opp-head))
-        opp-ft (util/point-features opp-eye eye)
-        opp-angle (:angle-from-me opp-ft)
-        dir (if (angle-left? opp-angle) -1 1)
+        dir (if (< (x-val (:position opp-eye))
+                   (x-val (:position eye))) -1 1)
         actions
         {:joint-motors
          {:leg-a1 [(* -5 dir) MT]

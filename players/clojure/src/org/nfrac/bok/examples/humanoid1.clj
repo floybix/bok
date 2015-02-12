@@ -1,7 +1,7 @@
 (ns org.nfrac.bok.examples.humanoid1
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [x-val y-val abs angle-left? turn-towards HALF_PI]]))
+             :refer [x-val y-val abs turn-towards HALF_PI]]))
 
 (def ident {:creature-type :humanoid
             :name "Example - tumbler"
@@ -23,9 +23,8 @@
         opp (get entities opp-key)
         opp-head (:head (:components opp))
         opp-eye (first (:points opp-head))
-        opp-ft (util/point-features opp-eye eye)
-        opp-angle (:angle-from-me opp-ft)
-        dir (if (angle-left? opp-angle) -1 1)
+        dir (if (< (x-val (:position opp-eye))
+                   (x-val (:position eye))) -1 1)
         BRACE -0.5
         a1-sp (* 8 dir)
         b1-sp (* 7 dir)

@@ -3,7 +3,7 @@
             [org.nfrac.bok.cljplayer.gait
              :refer [symmetric-gait grounded? humanoid-walk]]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [abs sign x-val y-val angle-left?
+             :refer [x-val y-val abs
                      turn-towards v-angle v-sub HALF_PI]]))
 
 (def ident {:creature-type :humanoid
@@ -42,9 +42,8 @@
         opp (get entities opp-key)
         opp-head (:head (:components opp))
         opp-eye (first (:points opp-head))
-        opp-ft (util/point-features opp-eye eye)
-        opp-angle (:angle-from-me opp-ft)
-        dir (if (angle-left? opp-angle) -1 1)
+        dir (if (< (x-val (:position opp-eye))
+                   (x-val (:position eye))) -1 1)
 
         ground-entities #{:ground}
 
