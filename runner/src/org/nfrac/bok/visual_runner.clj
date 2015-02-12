@@ -40,7 +40,7 @@
     (doseq [[player-key rc] (:player-raycast scene)
             :when rc
             :let [head (get-in scene [:bodies player-key :head])
-                  rc-length-px (* px-scale (or (:distance rc) 100.0))]]
+                  rc-length-px (* px-scale (or (:distance rc) 50.0))]]
       (quil/with-translation (->px (:position head))
         (quil/with-rotation [(- (:angle rc))]
           ;; dashed line

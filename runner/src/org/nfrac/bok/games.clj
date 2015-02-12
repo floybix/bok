@@ -719,7 +719,9 @@
         ladder (simple-entity
                 ladder-pois
                 (apply body! world {:type :static
-                                    :position [west-x 5]}
+                                    :position [(+ west-x 0.15) 5]}
+                       ;; surface in front of wall for raycast perception
+                       {:shape (edge [0 -0.5] [0 5.5])}
                        (for [poi ladder-pois]
                          {:shape (edge poi (v-add poi [-0.5 -0.1]))
                           :friction 1})))

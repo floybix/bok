@@ -164,7 +164,7 @@
   [world me my-id rc-action]
   (when-let [ang rc-action]
     (let [eye (-> me :components :head position)
-          extent 100.0
+          extent 50.0
           to (v-add eye (polar-xy extent ang))
           rc (first
               (raycast world eye to :closest
