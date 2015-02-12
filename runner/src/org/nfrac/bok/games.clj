@@ -458,7 +458,8 @@
                  [[-16 0] [16 0]]
                  (body! world {:type :static
                                :position [0 ceil-y]}
-                        {:shape (edge [-16 0] [16 0])}))
+                        {:shape (edge [-16 0] [-3 0])}
+                        {:shape (edge [3 0] [16 0])}))
         stal-depth 6
         stal-yend 10
         stal-xoff 1
