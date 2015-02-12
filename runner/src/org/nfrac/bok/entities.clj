@@ -1,6 +1,6 @@
 (ns org.nfrac.bok.entities
   (:require [org.nfrac.cljbox2d.core :refer :all]
-            [org.nfrac.cljbox2d.vec2d :refer [v-add v-scale]]))
+            [org.nfrac.cljbox2d.vec2d :refer [v-add v-scale polar-xy]]))
 
 (def ENTITY_TYPES #{:fixed :movable :food :creature})
 
@@ -159,6 +159,25 @@
     :ang-vel (entity-angular-velocity entity)}
    self?
    (assoc :joints (sense-joints entity inv-dt))))
+
+(defn raycast-perception
+  [world me my-id rc-action]
+  (when-let [ang rc-action]
+    (let [eye (-> me :components :head position)
+          extent 100.0
+          to (v-add eye (polar-xy extent ang))
+          rc (first
+              (raycast world eye to :closest
+                       :ignore (fn [fixt]
+                                 (let [id (-> fixt body-of user-data
+                                              :org.nfrac.bok/entity)]
+                                   ;; might be nil for extras, like bullets
+                                   (or (nil? id) (= id my-id))))))
+          hit-ent-id (when rc
+                       (-> rc :fixture body-of user-data :org.nfrac.bok/entity))]
+      {:angle ang
+       :entity hit-ent-id
+       :distance (when rc (float (* (:fraction rc) extent)))})))
 
 (def MAX_TORQUE 200.0)
 

@@ -46,14 +46,18 @@
      :dead-players (:dead-players game)
      :guns (:player-gun game)
      :energy (:player-energy game)
+     :raycast (get-in game [:player-raycast player-key])
      :entities obs}))
 
-(defn act-on-joints
+(defn act
   [game player-key actions]
-  (ent/apply-joint-actions! (get-in game [:entities player-key])
-                            (:joint-motors actions)
-                            (:joint-torques actions))
-  game)
+  (let [me (get-in game [:entities player-key])]
+    (ent/apply-joint-actions! me
+                              (:joint-motors actions)
+                              (:joint-torques actions))
+    (assoc-in game [:player-raycast player-key]
+              (ent/raycast-perception (:world game) me player-key
+                                      (:raycast actions)))))
 
 (defn world-step
   [game]
@@ -83,7 +87,7 @@
     :dt-secs (/ 1 32.0)
     ;; default method implementations
     :perceive perceive
-    :act act-on-joints
+    :act act
     :world-step world-step
     :check-end check-dead-or-time-limit}))
 
@@ -558,7 +562,7 @@
 (defn hunt-act
   [game player-key actions]
   ;; process usual actions first
-  (let [game (act-on-joints game player-key actions)
+  (let [game (act game player-key actions)
         world (:world game)
         gun-info (get-in game [:player-gun player-key])
         ang (:angle gun-info)]
