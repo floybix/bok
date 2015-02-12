@@ -135,12 +135,14 @@
 
 (defn perceive-entity
   [entity inv-dt self?]
-  {:type (:entity-type entity)
-   :components (observe-components entity self?)
-   :joints (sense-joints entity inv-dt)
-   :center-of-mass (entity-center-of-mass entity)
-   :velocity (entity-velocity entity)
-   :ang-vel (entity-angular-velocity entity)})
+  (cond->
+   {:type (:entity-type entity)
+    :components (observe-components entity self?)
+    :center-of-mass (entity-center-of-mass entity)
+    :velocity (entity-velocity entity)
+    :ang-vel (entity-angular-velocity entity)}
+   self?
+   (assoc :joints (sense-joints entity inv-dt))))
 
 (def MAX_TORQUE 200.0)
 

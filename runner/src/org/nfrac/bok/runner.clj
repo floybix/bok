@@ -1,8 +1,8 @@
 (ns org.nfrac.bok.runner
   (:require [org.nfrac.bok.games :as games]
+            [org.nfrac.bok.tree-diff :as diff]
             [org.nfrac.cljbox2d.core :as core]
-            [cognitect.transit :as transit]
-            [differ.core :as differ])
+            [cognitect.transit :as transit])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
@@ -35,8 +35,10 @@
   (zipmap (keys m) (map f (vals m))))
 
 (defn take-actions
-  "Calls action functions (with perception data) looked up by player
-   key in `action-fns`. For local testing only."
+  "Calls action functions -- looked up by player key in `action-fns`
+  -- with perception data and acts on their response. This is the full
+  perception data, not diffs as in the remote case. For local testing
+  only."
   [game action-fns]
   (let [perceive (:perceive game)
         act (:act game)
@@ -50,24 +52,31 @@
             action-fns)))
 
 (defn take-remote-actions
+  "Sends off diffs of each player's perception data and acts on their
+   response."
   [game]
   (let [{:keys [perceive act player-keys bout-id sockets]} game
-        dead? (:dead-players game)]
+        dead? (:dead-players game)
+        prev-obs (:current-perception game)
+        obs (into {} (for [player-key player-keys]
+                       [player-key (perceive game player-key)]))]
     (doseq [[player-key sock] sockets]
       (if (dead? player-key)
         () ;; send msg?
-        (let [ob (perceive game player-key)]
+        (let [ob-diff (diff/diff (get prev-obs player-key)
+                                 (get obs player-key))]
           (send-msg sock {:type :react
                           :bout-id bout-id
-                          :data ob}))))
-    (reduce (fn [game [player-key sock]]
-              (if (dead? player-key)
-                (act game player-key {})
-                (let [msg (recv-msg sock)
-                      actions (:data msg)]
-                  (act game player-key actions))))
-            game
-            sockets)))
+                          :data ob-diff}))))
+    (-> (reduce (fn [game [player-key sock]]
+                  (if (dead? player-key)
+                    (act game player-key {})
+                    (let [msg (recv-msg sock)
+                          actions (:data msg)]
+                      (act game player-key actions))))
+                game
+                sockets)
+        (assoc :current-perception obs))))
 
 (defn snapshot-scene
   [game prev-scene]
@@ -90,7 +99,7 @@
   [game]
   (let [prev-scene (:current-scene game {})
         new-scene (snapshot-scene game prev-scene)
-        scened (differ/diff prev-scene new-scene)]
+        scened (diff/diff prev-scene new-scene)]
     (-> (update-in game [:scene-deltas] conj scened)
         (assoc :current-scene new-scene))))
 

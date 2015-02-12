@@ -27,6 +27,14 @@
   (or (.send socket (to-transit msg))
       (throw (Exception. "ZMQ send failed."))))
 
+(defn patch
+  "Applies a `diff` map to the original map `m`. Like merge, but
+   merges maps recursively."
+  [m diff]
+  (if (and (map? m) (map? diff))
+    (merge-with patch m diff)
+    diff))
+
 (defn run-server
   "Receives messages on the socket in an infinite loop. The atom
    `peek-ref` stores state for any active bouts, in a map keyed by
@@ -44,8 +52,10 @@
                     (swap! bouts assoc bout-id {}))
           :react (let [bout-id (:bout-id msg)
                        last-state (@bouts bout-id)
-                       state (action-fn (assoc last-state
-                                          :current (:data msg)))
+                       state (-> last-state
+                                 (update-in [:current]
+                                            patch (:data msg))
+                                 (action-fn))
                        actions (:actions state)]
                    (send-msg socket {:type :actions
                                      :data actions})
