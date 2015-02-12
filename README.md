@@ -41,18 +41,18 @@ You can run some in-process demos:
 
 ```
 cd bok/runner
-lein run -m org.nfrac.bok.tests.legsoid sumo
+lein run -m org.nfrac.bok.tests.bipoid sumo
 lein run -m org.nfrac.bok.tests.humanoid vortex-maze
 lein run -m org.nfrac.bok.tests.wormoid altitude
-lein run -m org.nfrac.bok.tests.legsoid energy-race
-lein run -m org.nfrac.bok.tests.legsoid hunt
+lein run -m org.nfrac.bok.tests.bipoid energy-race
+lein run -m org.nfrac.bok.tests.bipoid hunt
 ```
 
 Or try running player servers communicating over TCP:
 
 ```
 cd bok/players/clojure
-lein run -m org.nfrac.bok.examples.legsoid1 5555
+lein run -m org.nfrac.bok.examples.bipoid1 5555
 lein run -m org.nfrac.bok.examples.humanoid1 5556
 cd bok/runner
 lein run -m org.nfrac.bok.visual-runner sumo tcp://localhost:5555 tcp://localhost:5556

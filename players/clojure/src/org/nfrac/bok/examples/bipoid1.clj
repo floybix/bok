@@ -1,10 +1,10 @@
-(ns org.nfrac.bok.examples.legsoid1
+(ns org.nfrac.bok.examples.bipoid1
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
              :refer [abs angle-left? turn-towards]]))
 
-(def ident {:creature-type :legsoid
-            :name "Example legsoid1"
+(def ident {:creature-type :bipoid
+            :name "Example bipoid1"
             :author "Felix Andrews <felix@nfrac.org>"
             :version "0.1.0-SNAPSHOT"
             :bok-version [0 1 0]})

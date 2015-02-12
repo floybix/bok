@@ -47,7 +47,7 @@
     {:components (into {} (map (juxt :key :component) segs))
      :joints (into {} (map (juxt :key :joint) segs))}))
 
-(defmethod build :legsoid
+(defmethod build :bipoid
   [type world position group-index]
   (let [head-pos (v-add position [0 1.0])
         head (-> (body! world {:position head-pos

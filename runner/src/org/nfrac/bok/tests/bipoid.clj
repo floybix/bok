@@ -1,4 +1,4 @@
-(ns org.nfrac.bok.tests.legsoid
+(ns org.nfrac.bok.tests.bipoid
   (:require [org.nfrac.bok.games :as games]
             [org.nfrac.bok.visual-runner :as visrun]
             [org.nfrac.bok.runner :as runner]
@@ -30,10 +30,10 @@
   [& [arena-type]]
   (let [arena-type (or (keyword arena-type) :sumo)
         game (games/build arena-type
-                          {:player-a :legsoid
-                           :player-b :legsoid}
+                          {:player-a :bipoid
+                           :player-b :bipoid}
                           {})]
-    (println "legsoid mass:"
+    (println "bipoid mass:"
              (-> game :entities :player-a ent/entity-mass))
     (-> game
         (visrun/run-with-display #(runner/step-local % {:player-a a-action
