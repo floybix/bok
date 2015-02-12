@@ -205,7 +205,7 @@
        :camera {:width 40 :height 20 :center [0 5]}
        :game-over-secs 60.0
        :world-step (fn [game]
-                     (sumo-step -2)))
+                     (sumo-step game -2)))
      (add-players players starting-pts))))
 
 ;; =============================================================================
