@@ -26,7 +26,7 @@
         minx (apply min xs)]
     (+ minx (* 0.5 (- maxx minx)))))
 
-(defn my-action-fn
+(defn my-action-fn-opp
   [state]
   (let [{:keys [entities my-key other-players]} (:current state)
         opp-key (first other-players)
@@ -88,6 +88,15 @@
       :actions actions
       :operator op
       :operator-start (- (:time (:current state)) elapsed))))
+
+(defn my-action-fn
+  [state]
+  (let [{:keys [entities other-players]} (:current state)
+        opp-key (first other-players)]
+    (if-not (get entities opp-key)
+      ;; can not see opponent. do nothing
+      state
+      (my-action-fn-opp state))))
 
 (defn main
   "For REPL use. Pass an `(atom {})` for peeking at the state."

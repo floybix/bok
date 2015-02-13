@@ -12,7 +12,7 @@
 ;; max torque
 (def MT 100.0)
 
-(defn my-action-fn
+(defn my-action-fn-opp
   [state]
   (let [{:keys [entities my-key other-players]} (:current state)
         opp-key (first other-players)
@@ -33,6 +33,15 @@
           }}]
     (assoc state
       :actions actions)))
+
+(defn my-action-fn
+  [state]
+  (let [{:keys [entities other-players]} (:current state)
+        opp-key (first other-players)]
+    (if-not (get entities opp-key)
+      ;; can not see opponent. do nothing
+      state
+      (my-action-fn-opp state))))
 
 (defn main
   "For REPL use. Pass an `(atom {})` for peeking at the state."

@@ -1,7 +1,8 @@
 (ns org.nfrac.bok.examples.wormoid1
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.util :as util
-             :refer [x-val y-val abs turn-towards PI]]))
+             :refer [x-val y-val abs turn-towards reverse-turn-towards
+                     PI HALF_PI]]))
 
 (def ident {:creature-type :wormoid
             :name "Example wormoid1"
@@ -12,13 +13,13 @@
 ;; max torque
 (def MT 50.0)
 
-(defn my-action-fn
+(defn my-action-fn-opp
   [state]
   (let [{:keys [entities my-key other-players]} (:current state)
         opp-key (first other-players)
         me (get entities my-key)
         ;; merge joint info into corresponding named components:
-        {:keys [head seg-1 seg-2 seg-3 seg-4 seg-5]}
+        {:keys [head seg-0 seg-1 seg-2 seg-3 seg-4]}
         (merge-with merge ;; merge nested maps
                     (:components me)
                     (:joints me))
@@ -31,26 +32,41 @@
         dir (if (neg? opp-xoff) -1 1)
         actions
         (cond
-         (< (abs opp-xoff) 1.2)
-         ;; spring up
+         ;; opponent right here; spring up
+         (< (abs opp-xoff) 1.0)
          {:joint-motors
           {:seg-1 (turn-towards 0 (:joint-angle seg-1) 0 30)
            :seg-2 (turn-towards 0 (:joint-angle seg-2) 0 30)
            :seg-3 (turn-towards 0 (:joint-angle seg-3) 0 30)
            :seg-4 (turn-towards 0 (:joint-angle seg-4) 0 30)
-           :seg-5 (turn-towards 0 (:joint-angle seg-5) 0 30)
            }}
-         :else
          ;; lie in wait
+         (< (abs opp-xoff) 3.5)
          {:joint-motors
-          {:seg-1 (turn-towards 0 (:joint-angle seg-1) 0 10)
+          {:seg-1 (turn-towards PI (:joint-angle seg-1) 0 3)
            :seg-2 (turn-towards PI (:joint-angle seg-2) 0 10)
-           :seg-3 (turn-towards PI (:joint-angle seg-3) 0 10)
-           :seg-4 (turn-towards PI (:joint-angle seg-4) 0 10)
-           :seg-5 (turn-towards PI (:joint-angle seg-5) 0 10)
-           }})]
+           :seg-3 (turn-towards PI (:joint-angle seg-3) 0 5)
+           :seg-4 (turn-towards PI (:joint-angle seg-4) 0 5)
+           }}
+         ;; move towards opponent
+         :else
+         {:joint-motors
+          ;; face opponent
+          {:seg-1 (reverse-turn-towards (* dir (- HALF_PI)) (:angle seg-0) 0 10)
+           :seg-2 [(* -5 dir) MT]
+           :seg-3 nil
+           :seg-4 (turn-towards (* dir (- HALF_PI)) (:angle seg-4) 0 10)}})]
     (assoc state
       :actions actions)))
+
+(defn my-action-fn
+  [state]
+  (let [{:keys [entities other-players]} (:current state)
+        opp-key (first other-players)]
+    (if-not (get entities opp-key)
+      ;; can not see opponent. do nothing
+      state
+      (my-action-fn-opp state))))
 
 (defn main
   "For REPL use. Pass an `(atom {})` for peeking at the state."

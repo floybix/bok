@@ -68,6 +68,16 @@
            tq (- (* k_p ang-diff) (* k_d ang-vel))]
        [sp (abs tq)])))
 
+(defn reverse-turn-towards
+  "Same as `turn-towards` but for controlling a joint with respect to
+   its parent limb. E.g. controlling a hip joint to target a stable
+   upright torso. In this case the direction of the joint motor should
+   be reversed."
+  ([target-ang curr-ang ang-vel speed]
+     (reverse-turn-towards target-ang curr-ang ang-vel speed 100 10))
+  ([target-ang curr-ang ang-vel speed k_p k_d]
+     (turn-towards 0 (- target-ang curr-ang) ang-vel speed k_p k_d)))
+
 (defn point-features
   [point eye]
   (let [{pos :position, vel :velocity} point
