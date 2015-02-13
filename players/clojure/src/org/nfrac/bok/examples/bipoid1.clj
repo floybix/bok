@@ -24,12 +24,12 @@
         opp-eye (first (:points opp-head))
         dir (if (< (x-val (:position opp-eye))
                    (x-val (:position eye))) -1 1)
+        BRACE -0.5
         actions
         {:joint-motors
-         {:leg-a1 [(* -5 dir) MT]
-          :leg-b1 [(* -4 dir) MT]
-          :leg-a2 (turn-towards 0 (:angle leg-a2) 0 30)
-          :leg-b2 (turn-towards 0 (:angle leg-b2) 0 30)
+         {:leg-b1 [(* -5 dir) MT]
+          :leg-a2 (turn-towards (* dir BRACE) (:angle leg-a2) 0 30)
+          :leg-b2 (turn-towards (* dir BRACE) (:angle leg-b2) 0 30)
           }}]
     (assoc state
       :actions actions)))

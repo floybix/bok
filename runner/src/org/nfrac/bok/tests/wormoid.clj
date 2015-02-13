@@ -10,17 +10,17 @@
 
 (defn a-action
   [info]
-  {:joint-motors {:seg-1 [8 MT]
-                  :seg-2 [0 MT]
-                  :seg-4 [5 MT]}
+  {:joint-motors {:seg-2 [8 MT]
+                  :seg-3 [0 MT]
+                  :seg-5 [5 MT]}
    :raycast Math/PI
    :gun {:fire true
          :speed 1}})
 
 (defn b-action
   [info]
-  {:joint-motors {:seg-2 [-10 MT]
-                  :seg-3 [-5 MT]}
+  {:joint-motors {:seg-3 [-10 MT]
+                  :seg-4 [-5 MT]}
    :gun {:fire true
          :speed 0.02}})
 
@@ -32,8 +32,6 @@
                           {:player-a :wormoid
                            :player-b :wormoid}
                           {})]
-    (println "wormoid mass:"
-             (-> game :entities :player-a ent/entity-mass))
     (-> game
         (visrun/run-with-display #(runner/step-local % {:player-a a-action
                                                         :player-b b-action}))

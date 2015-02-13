@@ -19,7 +19,7 @@
         opp-key (first other-players)
         me (get entities my-key)
         ;; merge joint info into corresponding named components:
-        {:keys [head seg-0 seg-1 seg-2 seg-3 seg-4]}
+        {:keys [head seg-1 seg-2 seg-3 seg-4 seg-5]}
         (merge-with merge ;; merge nested maps
                     (:components me)
                     (:joints me))
@@ -35,27 +35,27 @@
          ;; opponent right here; spring up
          (< (abs opp-xoff) 1.0)
          {:joint-motors
-          {:seg-1 (turn-towards 0 (:joint-angle seg-1) 0 30)
-           :seg-2 (turn-towards 0 (:joint-angle seg-2) 0 30)
+          {:seg-2 (turn-towards 0 (:joint-angle seg-2) 0 30)
            :seg-3 (turn-towards 0 (:joint-angle seg-3) 0 30)
            :seg-4 (turn-towards 0 (:joint-angle seg-4) 0 30)
+           :seg-5 (turn-towards 0 (:joint-angle seg-5) 0 30)
            }}
          ;; lie in wait
          (< (abs opp-xoff) 3.5)
          {:joint-motors
-          {:seg-1 (turn-towards PI (:joint-angle seg-1) 0 3)
-           :seg-2 (turn-towards PI (:joint-angle seg-2) 0 10)
-           :seg-3 (turn-towards PI (:joint-angle seg-3) 0 5)
+          {:seg-2 (turn-towards PI (:joint-angle seg-2) 0 3)
+           :seg-3 (turn-towards PI (:joint-angle seg-3) 0 10)
            :seg-4 (turn-towards PI (:joint-angle seg-4) 0 5)
+           :seg-5 (turn-towards PI (:joint-angle seg-5) 0 5)
            }}
          ;; move towards opponent
          :else
          {:joint-motors
           ;; face opponent
-          {:seg-1 (reverse-turn-towards (* dir (- HALF_PI)) (:angle seg-0) 0 10)
-           :seg-2 [(* -5 dir) MT]
-           :seg-3 nil
-           :seg-4 (turn-towards (* dir (- HALF_PI)) (:angle seg-4) 0 10)}})]
+          {:seg-2 (reverse-turn-towards (* dir (- HALF_PI)) (:angle seg-1) 0 10)
+           :seg-3 [(* -5 dir) MT]
+           :seg-4 nil
+           :seg-5 (turn-towards (* dir (- HALF_PI)) (:angle seg-5) 0 10)}})]
     (assoc state
       :actions actions)))
 

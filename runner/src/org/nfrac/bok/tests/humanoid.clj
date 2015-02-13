@@ -37,8 +37,6 @@
                           {:player-a :humanoid
                            :player-b :humanoid}
                           {})]
-    (println "humanoid mass:"
-             (-> game :entities :player-a ent/entity-mass))
     (-> game
         (visrun/run-with-display #(runner/step-local % {:player-a a-action
                                                         :player-b b-action}))

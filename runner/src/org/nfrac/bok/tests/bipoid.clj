@@ -33,8 +33,6 @@
                           {:player-a :bipoid
                            :player-b :bipoid}
                           {})]
-    (println "bipoid mass:"
-             (-> game :entities :player-a ent/entity-mass))
     (-> game
         (visrun/run-with-display #(runner/step-local % {:player-a a-action
                                                         :player-b b-action}))

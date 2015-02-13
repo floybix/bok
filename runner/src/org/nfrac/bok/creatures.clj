@@ -11,53 +11,54 @@
   (fn [type world position group-index]
     type))
 
-(defn revo-joint!
-  [body-a body-b world-anchor & {:as more}]
-  (joint! (into {:type :revolute
-                 :body-a body-a
-                 :body-b body-b
-                 :world-anchor world-anchor}
-                more)))
-
 (def DOWN (* -0.5 Math/PI))
 
 (defn limb
   "Builds a limb of consecutive segments based on the `lengths` sequence.
-   Each segment is attached with a revolute joint, and the first is
-   likewise attached to `host` body. Returns keys :components
-   and :joints, each a map with keywords made from `prefix` and a
-   number. Joints are keyed by their outer component name."
+   Each segment is by default attached with a revolute joint, and the
+   first is likewise attached to `host` body. If `:joints?` is given
+   any false elements are instead created as weld joints. Returns
+   keys :components and :joints, each a map with keywords made from
+   `prefix` and a number. Joints are keyed by their outer component
+   name."
   [world host position fixture-spec
-   & {:keys [lengths width prefix]
-      :or {lengths [0.75 0.75], width 0.1, prefix "seg-"}}]
+   & {:keys [lengths widths joints? prefix]
+      :or {lengths [0.75 0.75]
+           widths (repeat 0.1)
+           joints? (repeat true)
+           prefix "seg-"}}]
   (let [segs (loop [i 0
                     pos position
                     segs []]
                (if (>= i (count lengths))
                  segs
                  (let [len (nth lengths i)
+                       width (nth widths i)
+                       joint? (nth joints? i)
                        seg (-> (body! world {:position pos}
                                       (assoc fixture-spec
                                         :shape (rod [0 0] DOWN len width)))
                                (set-pois [[0.0 (- len)]]))
                        prev (or (:component (peek segs))
                                 host)
-                       rj (revo-joint! prev seg pos)]
+                       jt (joint! {:type (if joint? :revolute :weld)
+                                   :body-a prev
+                                   :body-b seg
+                                   :world-anchor pos})]
                    (recur (inc i)
                           (v-add pos [0.0 (- (- len (/ width 2)))])
                           (conj segs {:key (keyword (str prefix (inc i)))
                                       :component seg
-                                      :joint rj})))))]
+                                      :joint (when joint? jt)})))))]
     {:components (into {} (map (juxt :key :component) segs))
-     :joints (into {} (map (juxt :key :joint) segs))}))
+     :joints (into {} (map (juxt :key :joint) (filter :joint segs)))}))
 
 (defmethod build :bipoid
   [type world position group-index]
   (let [head-pos (v-add position [0 2.0])
-        head (-> (body! world {:position head-pos
-                               :fixed-rotation true}
-                        {:shape (circle 0.5)
-                         :density 5
+        head (-> (body! world {:position head-pos}
+                        {:shape (circle 0.25)
+                         :density 10
                          :friction 1
                          :restitution 0
                          :group-index group-index})
@@ -69,7 +70,7 @@
         limbs (merge-with
                merge ;; merge nested maps
                (limb world head head-pos limb-spec
-                     :lengths [1.0 1.0] :prefix "leg-a")
+                     :lengths [1.0 1.0] :prefix "leg-a" :joints? [false true])
                (limb world head head-pos limb-spec
                      :lengths [1.0 1.0] :prefix "leg-b"))]
     (entity (assoc (:components limbs)
@@ -145,21 +146,11 @@
                    :friction 1
                    :restitution 0
                    :group-index group-index}
-        len 0.75
-        width 0.1
-        ;; first segment is fixed to the head (not revolute)
-        seg-0 (-> (body! world {:position head-pos}
-                         (assoc limb-spec
-                           :shape (rod [0 0] DOWN len width)))
-                  (set-pois [[0.0 (- len)]]))
-        wj (joint! {:type :weld
-                    :body-a head :body-b seg-0
-                    :world-anchor head-pos})
-        seg-pos (v-add head-pos [0.0 (- (- len (/ width 2)))])
-        segs (limb world seg-0 seg-pos limb-spec
-                   :lengths (repeat 4 len) :prefix "seg-")]
+        segs (limb world head head-pos limb-spec
+                   :lengths (repeat 5 0.75) :prefix "seg-"
+                   ;; first segment is fixed to the head (not revolute)
+                   :joints? (cons false (repeat true)))]
     (entity (assoc (:components segs)
-              :seg-0 seg-0
               :head head)
             :joints (:joints segs)
             :entity-type :creature
