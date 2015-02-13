@@ -37,7 +37,8 @@
        :components
        vals
        (map mass)
-       (reduce +)))
+       (reduce +)
+       (float)))
 
 (defn entity-center-of-mass
   [entity]
@@ -144,10 +145,13 @@
                                             :org.nfrac.bok/entity)]
                                  ;; might be nil for extras, like bullets
                                  (or (nil? id) (= id my-id))))))
-        hit-ent-id (-> rc :fixture body-of user-data :org.nfrac.bok/entity)]
+        hit-ent-id (when rc
+                     (-> rc :fixture body-of user-data :org.nfrac.bok/entity))]
     (when-not hit-ent-id
       (println "line-of-sight? raycast returned nothing:" rc))
-    (= other-id hit-ent-id)))
+    ;; if raycast returned nothing assume it is a bug, allow perception
+    (or (nil? hit-ent-id)
+        (= other-id hit-ent-id))))
 
 (defn perceive-entity
   [entity inv-dt self?]
@@ -165,9 +169,11 @@
   (when-let [ang rc-action]
     (let [eye (-> me :components :head position)
           extent 50.0
+          ;; start from back of head to improve raycast reliability when close
+          from (v-add eye (polar-xy -0.25 ang))
           to (v-add eye (polar-xy extent ang))
           rc (first
-              (raycast world eye to :closest
+              (raycast world from to :closest
                        :ignore (fn [fixt]
                                  (let [id (-> fixt body-of user-data
                                               :org.nfrac.bok/entity)]
