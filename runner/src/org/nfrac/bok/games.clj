@@ -157,7 +157,7 @@
         entities {:ground ground
                   :left-wall left-wall
                   :right-wall right-wall}
-        starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
+        starting-pts (map vector [-10 10 0 -5 5] (repeat 0))]
     (-> (assoc empty-game
           :world world
           :game-type type
@@ -195,7 +195,7 @@
                        {:shape (box 15 20 [0 -20])
                         :friction 1}))
         entities {:ground ground}
-        starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
+        starting-pts (map vector [-10 10 0 -5 5] (repeat 0))]
     (->
      (assoc empty-game
        :world world
@@ -254,8 +254,8 @@
                         :vortex vortex}
                        walls)
         vortex-body (ent/entity-body vortex)
-        starting-pts [[-8 0] [8 0]]
-        starting-vels [[-3 -3] [3 3]]]
+        starting-pts [[-8 -1.5] [8 -1.5] [2 5] [-2 -8]]
+        starting-vels [[-3 -3] [3 3] [-3 3] [3 -3]]]
     (->
      (assoc empty-game
        :world world
@@ -407,7 +407,7 @@
                         :plat-left plat-left
                         :plat-right plat-right}
                        foods)
-        starting-pts (map vector [-10 10 0 -5 5] (repeat 10))]
+        starting-pts (map vector [-8 8 0 -4 4] (repeat 1))]
     (->
      (assoc empty-game
        :world world
@@ -534,7 +534,7 @@
                         :stalactite stalactite
                         :swing swing}
                        (concat blocks minis plats))
-        starting-pts (map vector [-10 10] (repeat 2.5))]
+        starting-pts (map vector [-10 10 0 -3 3] (repeat 0))]
     (->
      (assoc empty-game
        :world world
@@ -757,7 +757,7 @@
                   :ladder ladder
                   :boulder-lo boulder-lo
                   :boulder-hi boulder-hi}
-        starting-pts [[-10 8] [10 8]]]
+        starting-pts [[-10 4] [9 7] [-3 0] [0 9]]]
     (->
      (assoc empty-game
        :world world

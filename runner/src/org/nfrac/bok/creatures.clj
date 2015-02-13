@@ -4,6 +4,10 @@
             [org.nfrac.cljbox2d.vec2d :refer [v-add]]))
 
 (defmulti build
+  "Constructs a creature of type `type` in the JBox2D world, returning
+   it as an entity map. It will be standing at the given ground
+   position. Each player should be given a unique negative integer
+   group-index to filter self-collisions."
   (fn [type world position group-index]
     type))
 
@@ -49,7 +53,7 @@
 
 (defmethod build :bipoid
   [type world position group-index]
-  (let [head-pos (v-add position [0 1.0])
+  (let [head-pos (v-add position [0 2.0])
         head (-> (body! world {:position head-pos
                                :fixed-rotation true}
                         {:shape (circle 0.5)
@@ -58,7 +62,7 @@
                          :restitution 0
                          :group-index group-index})
                  (set-pois [[0 0]]))
-        limb-spec {:density 10
+        limb-spec {:density 20
                    :friction 1
                    :restitution 0
                    :group-index group-index}
@@ -77,7 +81,7 @@
 
 (defmethod build :humanoid
   [type world position group-index]
-  (let [head-pos (v-add position [0 1.0])
+  (let [head-pos (v-add position [0 2.9])
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 5
@@ -129,21 +133,33 @@
 
 (defmethod build :wormoid
   [type world position group-index]
-  (let [head-pos (v-add position [0 2.5])
+  (let [head-pos (v-add position [0 3.75])
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
-                         :density 5
+                         :density 10
                          :friction 1
                          :restitution 0
                          :group-index group-index})
                  (set-pois [[0 0]]))
-        limb-spec {:density 10
+        limb-spec {:density 20
                    :friction 1
                    :restitution 0
                    :group-index group-index}
-        segs (limb world head head-pos limb-spec
-                   :lengths (repeat 5 1.0) :prefix "seg-")]
+        len 0.75
+        width 0.1
+        ;; first segment is fixed to the head (not revolute)
+        seg-0 (-> (body! world {:position head-pos}
+                         (assoc limb-spec
+                           :shape (rod [0 0] DOWN len width)))
+                  (set-pois [[0.0 (- len)]]))
+        wj (joint! {:type :weld
+                    :body-a head :body-b seg-0
+                    :world-anchor head-pos})
+        seg-pos (v-add head-pos [0.0 (- (- len (/ width 2)))])
+        segs (limb world seg-0 seg-pos limb-spec
+                   :lengths (repeat 4 len) :prefix "seg-")]
     (entity (assoc (:components segs)
+              :seg-0 seg-0
               :head head)
             :joints (:joints segs)
             :entity-type :creature

@@ -12,7 +12,7 @@
   [info]
   {:joint-motors {:seg-1 [8 MT]
                   :seg-2 [0 MT]
-                  :seg-5 [5 MT]}
+                  :seg-4 [5 MT]}
    :raycast Math/PI
    :gun {:fire true
          :speed 1}})
