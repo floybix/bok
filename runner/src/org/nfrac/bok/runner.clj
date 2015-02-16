@@ -85,13 +85,14 @@
                        core/user-data)]
     (-> (core/snapshot-scene (:world game) prev-scene true identify)
         (dissoc :joints)
-        (merge (select-keys game [:game-type
+        (merge (select-keys game [:game-id
                                   :game-version
+                                  :game-type
+                                  :dt-secs
                                   :idents
                                   :player-keys
                                   :dead-players
                                   :final-result
-                                  :dt-secs
                                   :player-raycast
                                   :player-energy
                                   :player-gun])))))

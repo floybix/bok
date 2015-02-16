@@ -274,4 +274,3 @@
       (finally
         (println "closing ZMQ context")
         (.term ctx)))))
-

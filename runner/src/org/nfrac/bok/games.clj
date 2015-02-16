@@ -7,15 +7,22 @@
 
 ;; =============================================================================
 
+(def game-types #{:sumo :altitude :energy-race :hunt})
+
 (defrecord Game
-    [game-type
+    [game-id
      game-version
+     game-type
      world
      entities
      player-keys
      dead-players
      time
      dt-secs
+     game-over-secs
+     player-raycast
+     player-gun
+     player-energy
      ;; method implementations
      perceive
      act
@@ -40,7 +47,9 @@
                           ;; otherwise - normal perception
                           [k (ent/perceive-entity ent inv-dt (= k player-key))])))
                  (into {}))]
-    {:time (:time game)
+    {:game-type (:game-type game)
+     :gravity (:gravity game)
+     :time (:time game)
      :my-key player-key
      :other-players other-players
      :dead-players (:dead-players game)
@@ -69,7 +78,7 @@
 
 (defn check-dead-or-time-limit
   [game]
-  (if (>= (:time game) (:game-over-secs game Inf))
+  (if (>= (:time game) (or (:game-over-secs game) Inf))
     {:winner nil}
     (let [{:keys [dead-players player-keys]} game]
       (if (>= (count dead-players)
@@ -85,6 +94,7 @@
     :dead-players #{}
     :time 0.0
     :dt-secs (/ 1 32.0)
+    :game-over-secs 60.0
     ;; default method implementations
     :perceive perceive
     :act act
@@ -93,8 +103,9 @@
 
 (defn add-players
   "Creates entities for each given player and adds them to the world
-   and the game recor. `players` is a map from player keywords to a
-   creature type. `starting-pts` is a sequence of [x y] positions."
+   and the game record. `players` is a map from player keywords to a
+   creature type. `starting-pts` is a sequence of [x y] ground
+   positions."
   [game players starting-pts]
   (let [world (:world game)
         es (map (fn [player-type pt i]
@@ -116,20 +127,33 @@
 ;; =============================================================================
 
 (defmulti build*
-  (fn [type players opts]
-    type))
+  (fn [game-id players opts]
+    game-id))
 
 (defn build
-  "Returns a Game record where all Body objects have their entity and
-   components keys attached in user-data `:org.nfrac.bok/entity`
-   and `:org.nfrac.bok/component`."
-  [type players opts]
-  (let [game (build* type players opts)]
+  "Returns a Game record for the named `game-id`, assuming a
+   corresponding multimethod of `build*` has been registered. Argument
+   `players` should be a map of player id keywords to their creature
+   type (see `creatures/build`). The `opts` map is passed to the game
+   build method. Pass key `:game-over-secs` to override its default.
+
+   This wrapper function sets user-data on all Bodies with their
+   entity and components keys in `:org.nfrac.bok/entity` and
+   `:org.nfrac.bok/component`. Also sets :game-id and :gravity on the
+   game record."
+  [game-id players opts]
+  (let [game (build* game-id players opts)]
     (doseq [[ent-k ent] (:entities game)
             [cmp-k cmp] (:components ent)]
       (vary-user-data cmp #(assoc % :org.nfrac.bok/entity ent-k
                                   :org.nfrac.bok/component cmp-k)))
-    game))
+    (cond->
+     (assoc game
+       :game-id game-id
+       :gravity (v2xy (.getGravity (:world game))))
+     ;; allow options map to override the game timeout
+     (contains? opts :game-over-secs)
+     (assoc :game-over-secs (:game-over-secs opts)))))
 
 ;; =============================================================================
 ;; ## Sandbox.
@@ -137,7 +161,7 @@
 ;; Just a flat ground and enclosing walls. For testing.
 
 (defmethod build* :sandbox
-  [type players _]
+  [_ players _]
   (let [world (new-world)
         ground (simple-entity
                 [[-15 0] [15 0]]
@@ -159,9 +183,10 @@
                   :right-wall right-wall}
         starting-pts (map vector [-10 10 0 -5 5] (repeat 0))]
     (-> (assoc empty-game
-          :world world
-          :game-type type
           :game-version [0 0 1]
+          :game-type :sumo
+          :game-over-secs nil
+          :world world
           :entities entities
           :camera {:width 40 :height 20 :center [0 5]})
         (add-players players starting-pts))))
@@ -187,7 +212,7 @@
       game)))
 
 (defmethod build* :sumo
-  [type players _]
+  [_ players _]
   (let [world (new-world)
         ground (simple-entity
                 [[-15 0] [15 0]]
@@ -198,12 +223,11 @@
         starting-pts (map vector [-10 10 0 -5 5] (repeat 0))]
     (->
      (assoc empty-game
-       :world world
-       :game-type type
        :game-version [0 0 1]
+       :game-type :sumo
+       :world world
        :entities entities
        :camera {:width 40 :height 20 :center [0 5]}
-       :game-over-secs 60.0
        :world-step (fn [game]
                      (sumo-step game -2)))
      (add-players players starting-pts))))
@@ -217,7 +241,7 @@
 ;; walls.
 
 (defmethod build* :vortex-maze
-  [type players _]
+  [_ players _]
   (let [world (new-world [0 0])
         fence-pois [[-12 -10]
                     [-12 10]
@@ -258,9 +282,9 @@
         starting-vels [[-3 -3] [3 3] [-3 3] [3 -3]]]
     (->
      (assoc empty-game
-       :world world
-       :game-type type
        :game-version [0 0 1]
+       :game-type :sumo
+       :world world
        :entities entities
        :camera {:width 32 :height 24 :center [0 0]}
        :world-step (fn [game]
@@ -296,7 +320,7 @@
 
 (defn check-max-energy
   [game]
-  (when (>= (:time game) (:game-over-secs game Inf))
+  (when (>= (:time game) (or (:game-over-secs game) Inf))
     (let [[winner energy] (apply max-key val (:player-energy game))]
       {:winner winner
        :energy (:player-energy game)})))
@@ -332,8 +356,8 @@
         (:player-keys game))
        (world-step))))
 
-(defmethod build* :energy-race
-  [type players _]
+(defmethod build* :energy-race-one
+  [_ players _]
   (let [world (new-world)
         surface-fn (fn [x]
                      (+ (* (Math/pow x 4)
@@ -410,13 +434,12 @@
         starting-pts (map vector [-8 8 0 -4 4] (repeat 1))]
     (->
      (assoc empty-game
-       :world world
-       :game-type type
        :game-version [0 0 1]
+       :game-type :energy-race
+       :world world
        :entities entities
        :camera {:width 40 :height 22 :center [0 10]}
        :player-energy (zipmap (keys players) (repeat 300.0))
-       :game-over-secs 60.0
        :world-step energy-race-step
        :check-end check-max-energy)
      (add-players players starting-pts))))
@@ -431,7 +454,7 @@
 
 (defn check-highest
   [game]
-  (when (>= (:time game) (:game-over-secs game Inf))
+  (when (>= (:time game) (or (:game-over-secs game) Inf))
     (let [heights (->>
                    (map (fn [player-key]
                           (let [player (get-in game [:entities player-key])
@@ -444,8 +467,8 @@
       {:winner highest
        :heights heights})))
 
-(defmethod build* :altitude
-  [type players _]
+(defmethod build* :altitude-one
+  [_ players _]
   (let [world (new-world)
         ground-pts [[-16 0] [-4 0] [0 -2] [4 0] [16 0]]
         ground (simple-entity
@@ -537,12 +560,11 @@
         starting-pts (map vector [-10 10 0 -3 3] (repeat 0))]
     (->
      (assoc empty-game
-       :world world
-       :game-type type
        :game-version [0 0 1]
+       :game-type :altitude
+       :world world
        :entities entities
        :camera {:width 40 :height 20 :center [0 7]}
-       :game-over-secs 60.0
        :check-end check-highest)
      (add-players players starting-pts))))
 
@@ -625,8 +647,8 @@
       (update-in game [:dead-players] into dead)
       game)))
 
-(defmethod build* :hunt
-  [type players _]
+(defmethod build* :hunt-one
+  [_ players _]
   (let [world (new-world)
         east-x 15
         west-x -15
@@ -760,9 +782,9 @@
         starting-pts [[-10 4] [9 7] [-3 0] [0 9]]]
     (->
      (assoc empty-game
-       :world world
-       :game-type type
        :game-version [0 0 1]
+       :game-type :hunt
+       :world world
        :entities entities
        :camera {:width (+ (- east-x west-x) 2)
                 :height (+ ceil-y 2)
