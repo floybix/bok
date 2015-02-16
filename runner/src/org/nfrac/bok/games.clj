@@ -238,35 +238,54 @@
 ;; Zero gravity. Aim is to push opponent into central vortex. There
 ;; is a small suction force towards the vortex to avoid getting stuck
 ;; floating in space. Has enclosing walls around, and four internal
-;; walls.
+;; barriers.
 
 (defmethod build* :vortex-maze
   [_ players _]
   (let [world (new-world [0 0])
-        fence-pois [[-12 -10]
-                    [-12 10]
-                    [12 10]
-                    [12 -10]]
-        fence (simple-entity
-               fence-pois
-               (body! world {:type :static}
-                      {:shape (edge-loop fence-pois)
-                       :friction 1}))
-        wall-fx {:shape (box 3 0.2)
-                 :friction 1}
-        wall-pois [[-3 0] [3 0]]
-        walls (for [i (range 4)
-                    :let [k (keyword (str "wall-" i))
-                          pos (get [[5 -5]
-                                    [-5 -5]
-                                    [-5 5]
-                                    [5 5]] i)]]
-                [k (simple-entity
-                    wall-pois
+        height 20
+        width 24
+        half-height (/ height 2)
+        half-width (/ width 2)
+        v-wall-pts [[0 (- half-height)]
+                    [0 half-height]]
+        left-wall (simple-entity
+                   v-wall-pts
+                   (body! world {:type :static
+                                 :position [(- half-width) 0]}
+                          {:shape (apply edge v-wall-pts)}))
+        right-wall (simple-entity
+                    v-wall-pts
                     (body! world {:type :static
-                                  :position pos
-                                  :angle (* Math/PI (/ i 2))}
-                           wall-fx))])
+                                  :position [half-width 0]}
+                           {:shape (apply edge v-wall-pts)}))
+        h-wall-pts [[(- half-width) 0]
+                    [half-width 0]]
+        top-wall (simple-entity
+                  h-wall-pts
+                  (body! world {:type :static
+                                :position [0 half-height]}
+                         {:shape (apply edge h-wall-pts)}))
+        bot-wall (simple-entity
+                  h-wall-pts
+                  (body! world {:type :static
+                                :position [0 (- half-height)]}
+                         {:shape (apply edge h-wall-pts)}))
+        barrier-fx {:shape (box 3 0.2)
+                    :friction 1}
+        barrier-pts [[-3 0] [3 0]]
+        barriers (for [i (range 4)
+                       :let [k (keyword (str "barrier-" i))
+                             pos (get [[5 -5]
+                                       [-5 -5]
+                                       [-5 5]
+                                       [5 5]] i)]]
+                   [k (simple-entity
+                       barrier-pts
+                       (body! world {:type :static
+                                     :position pos
+                                     :angle (* Math/PI (/ i 2))}
+                              barrier-fx))])
         vortex (simple-entity
                 [[0 0]]
                 (body! world {:type :static
@@ -274,9 +293,12 @@
                               :user-data {:org.nfrac.cljbox2d.testbed/rgb
                                           [64 0 64]}}
                        {:shape (circle 1.0)}))
-        entities (into {:fence fence
+        entities (into {:left-wall left-wall
+                        :right-wall right-wall
+                        :top-wall top-wall
+                        :bottom-wall bot-wall
                         :vortex vortex}
-                       walls)
+                       barriers)
         vortex-body (ent/entity-body vortex)
         starting-pts [[-8 -1.5] [8 -1.5] [2 5] [-2 -8]]
         starting-vels [[-3 -3] [3 3] [-3 3] [3 -3]]]
@@ -302,7 +324,7 @@
                            ;; kill players touching vortex
                            player-keys (:player-keys game)
                            dead (distinct
-                                 (map (comp player-keys ::entity user-data)
+                                 (map (comp player-keys :org.nfrac.bok/entity user-data)
                                       (contacting vortex-body)))]
                        (if (seq dead)
                          (update-in game [:dead-players] into dead)
@@ -477,31 +499,35 @@
                        {:shape (edge-chain ground-pts)
                         :friction 1}))
         ceil-y 16
+        ceil-hole-x 3
         ceiling (simple-entity
-                 [[-16 0] [16 0]]
+                 [[-16 0] [(- ceil-hole-x) 0]
+                  [16 0] [ceil-hole-x 0]]
                  (body! world {:type :static
                                :position [0 ceil-y]}
-                        {:shape (edge [-16 0] [-3 0])}
-                        {:shape (edge [3 0] [16 0])}))
+                        {:shape (edge [-16 0] [(- ceil-hole-x) 0])}
+                        {:shape (edge [ceil-hole-x 0] [16 0])}))
         stal-depth 6
         stal-yend 10
         stal-xoff 1
-        stal-pois (for [sign [-1 1]
-                        frac (range 0.1 0.9 0.2)]
-                    (v-interp [0 (- stal-depth)]
-                              [(* sign stal-xoff) 0]
-                              frac))
+        stal-ladd-pts (for [sign [-1 1]
+                            frac (range 0.1 0.9 0.2)]
+                        (let [base-pt (v-interp [0 (- stal-depth)]
+                                                [(* sign stal-xoff) 0]
+                                                frac)
+                              out-pt (v-add base-pt [(* sign 0.5) 0.1])]
+                          [base-pt out-pt]))
         stalactite (simple-entity
-                    stal-pois
+                    (cons [0 (- stal-depth)]
+                          (map second stal-ladd-pts))
                     (apply body! world {:type :static
                                         :position [0 ceil-y]}
                            {:shape (polygon [[stal-xoff 0]
                                              [(- stal-xoff) 0]
                                              [0 (- stal-depth)]])
                             :friction 1}
-                           (for [pos stal-pois
-                                 :let [sign (if (neg? (first pos)) -1 1)]]
-                             {:shape (edge pos (v-add pos [(* sign 0.5) 0.1]))
+                           (for [[base-pt out-pt] stal-ladd-pts]
+                             {:shape (edge base-pt out-pt)
                               :friction 1})))
         rope-length 10
         swing-pois [[-2 0] [2 0]]
