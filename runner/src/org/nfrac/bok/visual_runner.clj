@@ -116,7 +116,8 @@
                     [labx laby] (->px (label-pt ent))
                     com (ent/entity-center-of-mass ent)
                     comv (ent/entity-velocity ent)]]
-        ;; when detail-level = 1, only label the players
+        ;; when detail-level = 1, only label the player entities
+        ;; when detail-level >= 2, label all entities
         (when (or (contains? (:player-keys game) ent-key)
                   (> detail-level 1))
           ;; label the entity
@@ -124,8 +125,11 @@
           (quil/fill (:text colors))
           (quil/text (name ent-key)
                      labx laby))
-        ;; label all components and draw points of interest
-        (when (<= 2 detail-level 3)
+        ;; when detail-level in [3-5], draw all points of interest
+        ;; when detail-level = 3, label non-player components
+        ;; when detail-level = 4, label all components
+        ;; when detail-level = 5, label all components + draw COM
+        (when (<= 3 detail-level 5)
           (doseq [[cmp-key body] components]
             ;; draw the points of interest
             (quil/stroke (:text colors))
@@ -134,15 +138,17 @@
                     :let [[x y] (->px (position body pt))
                           r-px (* px-scale 0.1)]]
               (quil/ellipse x y r-px r-px))
-            (when-not simple-ent?
-              ;; label the components
-              (quil/fill (:text colors))
-              (quil/with-translation (->px (center body))
-                (quil/with-rotation [(- (angle body))]
-                  (quil/text (name cmp-key)
-                             0 0))))))
+            (when (not simple-ent?)
+              (when (or (not (contains? (:player-keys game) ent-key))
+                        (>= detail-level 4))
+                ;; label the components
+                (quil/fill (:text colors))
+                (quil/with-translation (->px (center body))
+                  (quil/with-rotation [(- (angle body))]
+                    (quil/text (name cmp-key)
+                               0 0)))))))
         ;; center of mass
-        (when (= 3 detail-level)
+        (when (= 5 detail-level)
           (quil/stroke (:com colors))
           (quil/with-translation (->px com)
             (quil/with-rotation [(- (v-angle comv))]
@@ -150,8 +156,8 @@
                 (quil/line [0 0] [z 0])
                 (quil/line [z 0] [(- z 3) 2])
                 (quil/line [z 0] [(- z 3) -2])))))
-        ;; joints
-        (when (= 4 detail-level)
+        ;; when detail-level = 5, draw joints
+        (when (= 6 detail-level)
           (quil/text-align :right :center)
           ;; label the joints
           (doseq [[jt-key jt] joints
@@ -189,7 +195,7 @@
   [state event]
   (case (:raw-key event)
     \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
-                                                    (mod 5))))
+                                                    (mod 7))))
     \f (update-in state [::follow-idx]
                   (fn [i] (-> (inc (or i 0))
                              (mod (inc (count (:player-keys state)))))))
