@@ -5,7 +5,7 @@
                                              body-a body-b anchor-a radius
                                              fixture-of vary-user-data]]
             [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy v-scale
-                                              v-sub v-angle v-mag]]
+                                              v-sub v-angle v-mag abs]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil]
             [quil.middleware])
@@ -108,7 +108,7 @@
     ;; details, labels
     (quil/fill (:text colors))
     (when (zero? detail-level)
-      (quil/text "Press d to show details." 10 10))
+      (quil/text "Press d to show details, f to follow players." 10 10))
     (when (pos? detail-level)
       (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
@@ -190,10 +190,38 @@
   (case (:raw-key event)
     \d (update-in state [::detail-level] (fn [i] (-> (inc (or i 0))
                                                     (mod 5))))
+    \f (update-in state [::follow-idx]
+                  (fn [i] (-> (inc (or i 0))
+                             (mod (inc (count (:player-keys state)))))))
     \q (do
          (quil/exit)
          (assoc state :error "User quit."))
     (bed/key-press state event)))
+
+(defn camera-follow
+  [state]
+  (let [idx (::follow-idx state 0)]
+    (if (zero? idx)
+      state
+      (let [follow-player (nth (seq (:player-keys state))
+                               (dec idx))
+            [px py] (-> state :entities follow-player :components :head position)
+            {:keys [width height]} (:camera state)]
+        (update-in state [:camera :center]
+                   (fn [[x y]]
+                     (let [dx (- px x)
+                           dy (- py y)
+                           sign #(if (neg? %) -1 1)
+                           ;; offsets in metres exceeding tolerance margin (1/4)
+                           ox (-> (- (abs dx) (/ width 4))
+                                  (max 0)
+                                  (* (sign dx)))
+                           oy (-> (- (abs dy) (/ height 4))
+                                  (max 0)
+                                  (* (sign dy)))]
+                       ;; adjust at faster % for larger offsets (don't lose it!)
+                       [(+ x (* ox (/ (abs ox) width)))
+                        (+ y (* oy (/ (abs oy) height)))])))))))
 
 (defn record-snapshot
   "Allows rewind"
@@ -213,6 +241,7 @@
   (if (:paused? game)
     game
     (let [game (-> (step game)
+                   (camera-follow)
                    (record-snapshot)
                    (assoc :stepping? false
                           :paused? (:stepping? game)))]
