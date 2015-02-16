@@ -518,8 +518,10 @@
                               out-pt (v-add base-pt [(* sign 0.5) 0.1])]
                           [base-pt out-pt]))
         stalactite (simple-entity
-                    (cons [0 (- stal-depth)]
-                          (map second stal-ladd-pts))
+                    (concat [[stal-xoff 0]
+                             [(- stal-xoff) 0]
+                             [0 (- stal-depth)]]
+                            (map second stal-ladd-pts))
                     (apply body! world {:type :static
                                         :position [0 ceil-y]}
                            {:shape (polygon [[stal-xoff 0]
