@@ -14,6 +14,7 @@
                   :leg-b1 [-2 MT]
                   :leg-a2 [5 MT]
                   :leg-b2 [2 MT]}
+   :raycast 0
    :gun {:fire true
          :speed 1}})
 

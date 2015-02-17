@@ -171,7 +171,7 @@
     (doseq [[k sock] sockmap]
       (send-msg sock {:type :identify}))
     (let [idents (remap (fn [sock]
-                          (recv-msg sock))
+                          (:data (recv-msg sock)))
                         sockmap)
           creature-types (remap :creature-type idents)]
       (println idents)

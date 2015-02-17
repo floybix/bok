@@ -44,8 +44,8 @@
     (while true
       (let [msg (recv-msg socket)]
         (case (:type msg)
-          :identify (send-msg socket (assoc ident
-                                       :type :ident))
+          :identify (send-msg socket {:type :ident
+                                      :data ident})
           :invite (let [bout-id (:bout-id msg)]
                     (send-msg socket {:type :join
                                       :bout-id bout-id})
