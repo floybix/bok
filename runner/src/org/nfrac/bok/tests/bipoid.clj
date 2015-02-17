@@ -1,8 +1,8 @@
 (ns org.nfrac.bok.tests.bipoid
   (:require [org.nfrac.bok.games :as games]
+            [org.nfrac.bok.game-arenas] ;; load games
             [org.nfrac.bok.visual-runner :as visrun]
             [org.nfrac.bok.runner :as runner]
-            [org.nfrac.bok.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
 ;; max torque

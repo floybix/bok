@@ -1,5 +1,6 @@
 (ns org.nfrac.bok.tests.pose
   (:require [org.nfrac.bok.games :as games]
+            [org.nfrac.bok.game-arenas] ;; load games
             [org.nfrac.bok.visual-runner :as visrun]
             [org.nfrac.bok.runner :as runner]
             [clojure.pprint :refer [pprint]]))

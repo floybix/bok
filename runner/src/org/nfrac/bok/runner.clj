@@ -1,5 +1,6 @@
 (ns org.nfrac.bok.runner
   (:require [org.nfrac.bok.games :as games]
+            [org.nfrac.bok.game-arenas] ;; load games
             [org.nfrac.bok.tree-diff :as diff]
             [org.nfrac.cljbox2d.core :as core]
             [cognitect.transit :as transit])
