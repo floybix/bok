@@ -43,7 +43,7 @@ You can run some in-process demos:
 cd bok/runner
 lein run -m org.nfrac.bok.tests.bipoid sumo
 lein run -m org.nfrac.bok.tests.humanoid vortex-maze
-lein run -m org.nfrac.bok.tests.wormoid altitude-one
+lein run -m org.nfrac.bok.tests.wormoid climbly-altitude
 lein run -m org.nfrac.bok.tests.bipoid energy-race-one
 lein run -m org.nfrac.bok.tests.bipoid hunt-one
 ```

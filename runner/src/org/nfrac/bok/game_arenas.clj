@@ -6,7 +6,7 @@
              :refer [v-add v-sub polar-xy v-interp v-scale]]))
 
 ;; =============================================================================
-;; ## Sandbox.
+;; ## sandbox.
 ;;
 ;; Just a flat ground and side walls. For testing.
 
@@ -39,7 +39,7 @@
             :camera {:width 40 :height 20 :center [0 5]}))))
 
 ;; =============================================================================
-;; ## Sumo
+;; ## sumo
 ;;
 ;; Just a flat ground/platform.
 
@@ -59,16 +59,81 @@
             :camera {:width 40 :height 20 :center [0 5]}))))
 
 ;; =============================================================================
-;; ## Altitude
+;; ## mayan
+;;
+;; Arena has one ground entity of slopes up to a stepped pyramid, and
+;; one movable box on its summit.
+
+(defn mayan
+  [world]
+  (let [step-pts []
+        outer-x 15.0
+        summit-h 8.0
+        steps-y 2.0
+        step-radius (fn [y] (+ 0.5 (- summit-h y)))
+        ground (simple-entity
+                (concat
+                 [[outer-x 0] [(- outer-x) 0]]
+                 (for [y (range steps-y summit-h)
+                       yo [0 1]
+                       dir [-1 1]]
+                   [(* dir (step-radius y)) (+ y yo)]))
+                (apply body! world {:type :static}
+                       {:shape (polygon [[outer-x 0]
+                                         [(step-radius steps-y) steps-y]
+                                         [(- (step-radius steps-y)) steps-y]
+                                         [(- outer-x) 0]
+                                         [(- outer-x) -20]
+                                         [outer-x -20]])
+                        :friction 1}
+                       (for [y (range steps-y summit-h)]
+                         {:shape (box (step-radius y) 0.5 [0 (+ y 0.5)])
+                          :friction 1})))
+        block-fx {:shape (box 0.5 0.5)
+                  :density 2
+                  :friction 1}
+        block-pois [[-0.5 0.5]
+                    [0.5 0.5]
+                    [0.5 -0.5]
+                    [-0.5 -0.5]]
+        block (simple-entity
+               block-pois
+               (body! world {:position [0 (+ summit-h 0.5)]}
+                      block-fx)
+               :entity-type :movable)
+        entities {:ground ground
+                  :block block}
+        starting-pts [[-10 2] [10 2]]]
+    [entities starting-pts]))
+
+(defmethod build* :mayan-altitude
+  [_ players _]
+  (let [world (new-world)
+        [entities starting-pts] (mayan world)]
+    (->
+     (games/altitude-game world entities players starting-pts)
+     (assoc :game-version [0 0 1]
+            :camera {:width 40 :height 20 :center [0 7]}))))
+
+(defmethod build* :mayan-hunt
+  [_ players _]
+  (let [world (new-world)
+        [entities starting-pts] (mayan world)]
+    (->
+     (games/hunt-game world entities players starting-pts)
+     (assoc :game-version [0 0 1]
+            :camera {:width 40 :height 20 :center [0 7]}))))
+
+;; =============================================================================
+;; ## climbly
 ;;
 ;; Arena has flat ground with a gulley in the middle, large and small
 ;; blocks, two platforms, a central swing (on rope joints) and a
 ;; stalactite with hand-holds.
 
-(defmethod build* :altitude-one
-  [_ players _]
-  (let [world (new-world)
-        ground-pts [[-16 0] [-4 0] [0 -2] [4 0] [16 0]]
+(defn climbly
+  [world]
+  (let [ground-pts [[-16 0] [-4 0] [0 -2] [4 0] [16 0]]
         ground (simple-entity
                 ground-pts
                 (body! world {:type :static}
@@ -161,9 +226,24 @@
                         :stalactite stalactite
                         :swing swing}
                        (concat blocks minis plats))
-        starting-pts (map vector [-10 10 0 -3 3] (repeat 0))]
+        starting-pts [[-10 0] [10 0] [0 0] [-3 0] [3 0]]]
+    [entities starting-pts]))
+
+(defmethod build* :climbly-altitude
+  [_ players _]
+  (let [world (new-world)
+        [entities starting-pts] (climbly world)]
     (->
      (games/altitude-game world entities players starting-pts)
+     (assoc :game-version [0 0 1]
+            :camera {:width 40 :height 20 :center [0 7]}))))
+
+(defmethod build* :climbly-hunt
+  [_ players _]
+  (let [world (new-world)
+        [entities starting-pts] (climbly world)]
+    (->
+     (games/hunt-game world entities players starting-pts)
      (assoc :game-version [0 0 1]
             :camera {:width 40 :height 20 :center [0 7]}))))
 

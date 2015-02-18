@@ -283,12 +283,14 @@
 ;; =============================================================================
 ;; ## game-type :hunt
 ;;
-;; Winner is last remaining player. Players are killed if hit by a
-;; bullet. Each player has a gun attached to their head. It does not
+;; Winner is last surviving player. Players are killed if hit by
+;; bullets. Each player has a gun attached to their head. It does not
 ;; collide with things, but it has some angle at which it is pointed.
 ;; There are special actions to rotate the gun and to fire the gun.
-;; There is a maximum speed at which the gun can be rotated, so it can
-;; take several time steps to aim it.
+;; Guns can be rotated at a maximum of 1.0 radians per second, so
+;; aiming can take several time steps. After firing (and at the start
+;; of the game), a gun can not be fired again for 2.0 seconds.
+;; Currently there is effectively no limit to ammo.
 
 (def GUN_SPEED 1.0)
 (def GUN_AMMO 50)
