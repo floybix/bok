@@ -248,12 +248,12 @@
             :camera {:width 40 :height 20 :center [0 7]}))))
 
 ;; =============================================================================
-;; ## Energy Race
+;; ## bowl
 ;;
-;; Arena is a x^4 curve with a sine wave mixed in for foot-holds. Also
-;; two high platforms.
+;; Arena is a bowl-like x^4 curve with a sine wave mixed in for
+;; foot-holds. Also two high platforms.
 
-(defmethod build* :energy-race-one
+(defmethod build* :bowl-energy-race
   [_ players _]
   (let [world (new-world)
         surface-fn (fn [x]
@@ -328,24 +328,23 @@
                         :plat-left plat-left
                         :plat-right plat-right}
                        foods)
-        starting-pts (map vector [-8 8 0 -4 4] (repeat 1))]
+        starting-pts [[-8 1] [8 1] [0 0] [-4 0] [4 0]]]
     (->
      (games/energy-race-game world entities players starting-pts)
      (assoc :game-version [0 0 1]
-       :camera {:width 40 :height 22 :center [0 10]}))))
+            :camera {:width 40 :height 22 :center [0 10]}))))
 
 ;; =============================================================================
-;; ## Hunt
+;; ## cavern
 ;;
 ;; Arena has a flat ground with a central pedestal, slopes leading up
 ;; and towards the center from both left and right (meeting at a
 ;; central gap), a high left platform, and a ladder on the left wall.
 ;; Also two movable boulders.
 
-(defmethod build* :hunt-one
-  [_ players _]
-  (let [world (new-world)
-        east-x 15
+(defn cavern
+  [world]
+  (let [east-x 15
         west-x -15
         ceil-y 14
         ground (simple-entity
@@ -475,12 +474,18 @@
                   :boulder-lo boulder-lo
                   :boulder-hi boulder-hi}
         starting-pts [[-10 4] [9 7] [-3 0] [0 9]]]
+    [entities starting-pts]))
+
+(defmethod build* :cavern-hunt
+  [_ players _]
+  (let [world (new-world)
+        [entities starting-pts] (cavern world)]
     (->
      (games/hunt-game world entities players starting-pts)
      (assoc :game-version [0 0 1]
-            :camera {:width (+ (- east-x west-x) 2)
-                     :height (+ ceil-y 2)
-                     :center [0 (/ ceil-y 2)]}))))
+            :camera {:width 32
+                     :height 16
+                     :center [0 7]}))))
 
 ;; =============================================================================
 ;; ## Vortex Maze
