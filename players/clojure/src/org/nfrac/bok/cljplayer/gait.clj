@@ -12,96 +12,143 @@
   (x-val (:position (first (:points component)))))
 
 (defn grounded?
-  [cmp ground-entities]
-  (some ground-entities
-        (map :entity (:contacts cmp))))
+  [cmp]
+  (seq (:contacts cmp)))
 
-(defn symmetric-gait
-  "Performs a symmetric gait such as walking.
-   Currently assumes humanoid creature. Adapted from Yin et al (2007)
-   SIMBICON. This is a finite state machine. Returns an action map, or
-   nil to reliquish control from the current op.
+(defn balance-d
+  ;; balance feedback to swing hip - distance term
+  [me swing-leg-k]
+  (let [com (:center-of-mass me)
+        cmp (get-in me [:components swing-leg-k])]
+    (- (x-val com) (x-offset cmp))))
 
-   With 2 stages:
-   * op 0 ==> stage 0, stance a, swing b
-   * op 1 ==> stage 1, stance a, swing b
-   * op 2 ==> stage 0, stance b, swing a
-   * op 3 ==> stage 1, stance b, swing a"
-  [me dir stages current-op time-in-op ground-entities]
-  (let [params (get stages (mod current-op (count stages)))
-        stance (if (< current-op (count stages)) :a :b)
-        swing (case stance :a :b, :b :a)
-        swing-leg (mapv #(get-in me [:components %])
-                        (get leg-cmps swing))
-        ;; balance feedback to swing hip
-        com (:center-of-mass me)
-        comv (:velocity me)
-        d (- (x-val com) (x-offset (second swing-leg)))
-        adj (+ (* (:c-d params) d)
-               (* (:c-v params) (x-val comv)))]
-    (when-not (if (= :foot-contact (:dt params))
-                (or (grounded? (second swing-leg) ground-entities)
-                    (grounded? (last swing-leg) ground-entities)
-                    ;; swing foot already behind
-                    (neg? (* dir (:angle (first swing-leg)))))
-                (>= time-in-op (:dt params)))
+(defn eval-gait-phase
+  ""
+  [me dir pose defaults time-in-phase]
+  (let [components (:components me)
+        joints (:joints me)
+        done? (or
+               (when-let [cs (:contact (:until pose))]
+                 (some grounded? (map components cs)))
+               (when-let [dt (:dt (:until pose))]
+                 (>= time-in-phase dt)))]
+    (when-not done?
       (->>
-       (for [limb [:stance-leg :swing-leg :stance-arm :swing-arm]
-             :let [leg? (contains? #{:stance-leg :swing-leg} limb)
-                   limb-ks (case limb
-                             :stance-leg (get leg-cmps stance)
-                             :swing-leg (get leg-cmps swing)
-                             :stance-arm (get arm-cmps stance)
-                             :swing-arm (get arm-cmps swing))]
-             [i cmp-k theta] (map vector (range) limb-ks (get params limb))
-             :let [ang-vel (get-in me [:joints cmp-k :joint-speed])
-                   curr-ang (cond
-                             ;; swing hip an absolute angle
-                             (and (= limb :swing-leg) (zero? i))
-                             (get-in me [:components cmp-k :angle])
-                             ;; stance hip to balance torso upright (reverse joint)
-                             (and (= limb :stance-leg) (zero? i))
-                             (- (get-in me [:components :torso :angle]))
-                             ;; others in parent coordinates
-                             :else
-                             (get-in me [:joints cmp-k :joint-angle]))
-                   target-ang (+ (* dir theta)
-                                 ;; balance feedback to swing hip
-                                 (if (and (= limb :swing-leg) (zero? i))
-                                   adj
-                                   0))]]
+       (for [[cmp-k params*] (dissoc pose :until)
+             :let [params (merge (cmp-k defaults) params*)
+                   ang-vel (get-in joints [cmp-k :joint-speed])
+                   target-cmp-k (or (:on-parent params) cmp-k)
+                   curr-ang* (cond
+                              (:joint-angle params)
+                              (get-in joints [cmp-k :joint-angle])
+                              (:angle params)
+                              (get-in components [target-cmp-k :angle]))
+                   curr-ang (if (:on-parent params)
+                              (- curr-ang*)
+                              curr-ang*)
+                   adj (if-let [[balance-k c-d c-v] (:balance params)]
+                         (+ (* c-d (balance-d me balance-k))
+                            (* c-v (x-val (:velocity me))))
+                         0.0)
+                   target-ang (-> (or (:joint-angle params)
+                                      (:angle params))
+                                  (* dir)
+                                  (+ adj))]]
          [cmp-k
-          (if leg?
-            (turn-towards target-ang curr-ang ang-vel (:leg-speed params))
-            (turn-towards target-ang curr-ang ang-vel (:arm-speed params)
-                          (:arm-k-d params) (:arm-k-v params)))])
+          (turn-towards target-ang curr-ang ang-vel (:speed params)
+                        (:k-d params 100) (:k-v params 10))])
        (into {})
        (hash-map :joint-motors)))))
 
+(defn eval-gait
+  "Applies a given gait specification in the current situation.
+   Returns `[actions new-gait-state"
+  [me dir gait gait-state t]
+  (loop [phase (:phase gait-state 0)
+         time-in-phase (- t (:start gait-state 0))]
+    (let [pose (get (:poses gait) phase)]
+      (if-let [actions (eval-gait-phase me dir pose (:defaults gait)
+                                        time-in-phase)]
+        [actions
+         {:phase phase, :start (- t time-in-phase)}]
+       (recur (mod (inc phase) (* 2 (count gait)))
+              0.0)))))
+
+(defn symmetric-gait
+  [half-gait symm-map]
+  (let [opp (fn [k] (or (symm-map k) k))
+        opp-val (fn [m]
+                  (cond-> m
+                          (:balance m)
+                          (update-in [:balance 0] opp)
+                          (:on-parent m)
+                          (update-in [:on-parent] opp)))
+        opp-pose (fn [pose]
+                   (-> (zipmap (map opp (keys pose))
+                               (map opp-val (vals pose)))
+                       (update-in [:until :contact]
+                                  #(set (map opp %)))))]
+    (update-in half-gait [:poses]
+               (fn [poses]
+                 (into poses (map opp-pose poses))))))
+
+(def humanoid-symmetry-map
+  (let [limbs {:legs [[:leg-a1 :leg-a2 :leg-a3]
+                      [:leg-b1 :leg-b2 :leg-b3]]
+               :arms [[:arm-a1 :arm-a2]
+                      [:arm-b1 :arm-b2]]}]
+    (->> (vals limbs)
+         (mapcat (fn [[limb-a limb-b]]
+                   [(zipmap limb-a limb-b)
+                    (zipmap limb-b limb-a)]))
+         (reduce merge))))
+
+(def humanoid-leg-cmp-ks [:leg-a1 :leg-a2 :leg-a3
+                          :leg-b1 :leg-b2 :leg-b3])
+
+(def humanoid-arm-cmp-ks [:arm-a1 :arm-a2
+                          :arm-b1 :arm-b2])
+
+;; Adapted from Yin et al (2007) SIMBICON.
+(def humanoid-half-walk
+  {:defaults (merge (zipmap humanoid-leg-cmp-ks
+                            (repeat {:speed 8
+                                     :k-d 100
+                                     :k-v 10}))
+                    (zipmap humanoid-arm-cmp-ks
+                            (repeat {:speed 2
+                                     :k-d 40
+                                     :k-v 4})))
+   :poses [{:until {:dt 0.3}
+            ;; stance leg
+            :leg-a1 {:on-parent :torso, :angle 0.05}
+            :leg-a2 {:joint-angle -0.05}
+            :leg-a3 {:joint-angle (+ HALF_PI 0.0)}
+            ;; swing leg
+            :leg-b1 {:angle 0.5, :balance [:leg-b2 0.0 0.2]}
+            :leg-b2 {:joint-angle -1.1}
+            :leg-b3 {:joint-angle (+ HALF_PI 0.2)}
+            ;; arms
+            :arm-a1 {:joint-angle 0.3}
+            :arm-a2 {:joint-angle 0.4}
+            :arm-b1 {:joint-angle -0.3}
+            :arm-b2 {:joint-angle 0.4}
+            }
+           {:until {:contact #{:leg-b2 :leg-b3}}
+            ;; stance leg
+            :leg-a1 {:on-parent :torso, :angle 0.05}
+            :leg-a2 {:joint-angle -0.1}
+            :leg-a3 {:joint-angle (+ HALF_PI 0.2)}
+            ;; swing leg
+            :leg-b1 {:angle -0.05, :balance [:leg-b2 2.0 0.0]}
+            :leg-b2 {:joint-angle -0.1}
+            :leg-b3 {:joint-angle (+ HALF_PI 0.0)}
+            ;; arms
+            :arm-a1 {:joint-angle -0.3}
+            :arm-a2 {:joint-angle 0.4}
+            :arm-b1 {:joint-angle 0.3}
+            :arm-b2 {:joint-angle 0.4}
+            }]})
+
 (def humanoid-walk
-  [{:dt 0.3
-    :c-d 0.0
-    :c-v 0.2
-    ;;           \|/ this is torso angle (hip joint conversely)
-    :stance-leg [0.05 -0.05 (+ HALF_PI 0.0)]
-    :swing-leg [0.5 -1.1 (+ HALF_PI 0.2)]
-    :stance-arm [0.3 0.4]
-    :swing-arm [-0.3 0.4]
-    :leg-speed 8
-    :arm-speed 2
-    :arm-k-d 40
-    :arm-k-v 4
-    }
-   {:dt :foot-contact
-    :c-d 2.0
-    :c-v 0.0
-    ;;           \|/ this is torso angle (hip joint conversely)
-    :stance-leg [0.05 -0.1 (+ HALF_PI 0.2)]
-    :swing-leg [-0.05 -0.1 (+ HALF_PI 0.0)]
-    :stance-arm [-0.3 0.4]
-    :swing-arm [0.3 0.4]
-    :leg-speed 8
-    :arm-speed 2
-    :arm-k-d 40
-    :arm-k-v 4
-    }])
+  (symmetric-gait humanoid-half-walk humanoid-symmetry-map))

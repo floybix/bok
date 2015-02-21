@@ -1,7 +1,7 @@
 (ns org.nfrac.bok.examples.humanoid2
   (:require [org.nfrac.bok.cljplayer :as serv]
             [org.nfrac.bok.cljplayer.gait
-             :refer [symmetric-gait grounded? humanoid-walk]]
+             :refer [eval-gait grounded? humanoid-walk]]
             [org.nfrac.bok.cljplayer.util :as util
              :refer [x-val y-val abs
                      turn-towards v-angle v-sub HALF_PI]]))
@@ -44,9 +44,6 @@
         opp-eye (first (:points opp-head))
         dir (if (< (x-val (:position opp-eye))
                    (x-val (:position eye))) -1 1)
-
-        ground-entities #{:ground}
-
         legspan (->> [leg-a1 leg-a2 leg-a3 leg-b1 leg-b2 leg-b3]
                      (map x-offset))
         balance? (and (> (height head) (+ (height leg-a2) 1.5))
@@ -55,10 +52,10 @@
                          (- 0.15 (x-offset head))
                          (+ 0.15 (x-offset head))
                          (apply max legspan)))
-        react-arms (if (or (grounded? arm-a1 ground-entities)
-                           (grounded? arm-b1 ground-entities)
-                           (grounded? arm-a2 ground-entities)
-                           (grounded? arm-b2 ground-entities))
+        react-arms (if (or (grounded? arm-a1)
+                           (grounded? arm-b1)
+                           (grounded? arm-a2)
+                           (grounded? arm-b2))
                      {:arm-a1 (turn-towards 0 (:angle arm-a1) (:joint-speed arm-a1) 12)
                       :arm-b1 (turn-towards 0 (:angle arm-b1) (:joint-speed arm-b1) 12)
                       :arm-a2 (turn-towards 0 (:angle arm-a2) (:joint-speed arm-a2) 12)
@@ -67,27 +64,16 @@
                       :arm-b1 (turn-towards 0 (- (:angle torso)) (:joint-speed arm-b1) 8)
                       :arm-a2 (turn-towards 0 (:joint-angle arm-a2) (:joint-speed arm-a2) 5)
                       :arm-b2 (turn-towards 0 (:joint-angle arm-b2) (:joint-speed arm-b2) 5)})
-
-        curr-op (:operator state 0)
-        curr-elapsed (- (:time (:current state))
-                        (:operator-start state 0))
-        gait humanoid-walk
-        [op actions elapsed] (loop [op curr-op
-                                    elapsed curr-elapsed]
-                               (if-let [actions* (symmetric-gait me dir gait op elapsed
-                                                                 ground-entities)]
-                                 (let [actions (if balance?
-                                                 actions*
-                                                 (merge actions* react-arms))]
-                                   [op actions elapsed])
-                                 (recur (mod (inc op) (* 2 (count gait)))
-                                        0.0)))]
-    (print (str op " "))
+        [actions* gait-state] (eval-gait me dir humanoid-walk (:gait-state state)
+                                         (:time (:current state)))
+        actions (if balance?
+                  actions*
+                  (merge actions* react-arms))]
+    (print (str (:phase gait-state) " "))
     (flush)
     (assoc state
       :actions actions
-      :operator op
-      :operator-start (- (:time (:current state)) elapsed))))
+      :gait-state gait-state)))
 
 (defn my-action-fn
   [state]
