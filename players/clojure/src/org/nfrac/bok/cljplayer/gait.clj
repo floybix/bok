@@ -2,11 +2,6 @@
   (:require [org.nfrac.bok.cljplayer.util :as util
              :refer [abs x-val turn-towards HALF_PI]]))
 
-(def leg-cmps {:a [:leg-a1 :leg-a2 :leg-a3]
-               :b [:leg-b1 :leg-b2 :leg-b3]})
-(def arm-cmps {:a [:arm-a1 :arm-a2]
-               :b [:arm-b1 :arm-b2]})
-
 (defn x-offset
   [component]
   (x-val (:position (first (:points component)))))
@@ -24,7 +19,7 @@
 
 (defn eval-gait-phase
   ""
-  [me dir pose defaults time-in-phase]
+  [me dir pose time-in-phase]
   (let [components (:components me)
         joints (:joints me)
         done? (or
@@ -34,9 +29,8 @@
                  (>= time-in-phase dt)))]
     (when-not done?
       (->>
-       (for [[cmp-k params*] (dissoc pose :until)
-             :let [params (merge (cmp-k defaults) params*)
-                   ang-vel (get-in joints [cmp-k :joint-speed])
+       (for [[cmp-k params] (dissoc pose :until)
+             :let [ang-vel (get-in joints [cmp-k :joint-speed])
                    target-cmp-k (or (:on-parent params) cmp-k)
                    curr-ang* (cond
                               (:joint-angle params)
@@ -60,19 +54,33 @@
        (into {})
        (hash-map :joint-motors)))))
 
+(defn pose-with-defaults
+  [pose limb-defaults defaults]
+  (reduce-kv (fn [m k v]
+               (assoc m k
+                      (if (= k :until)
+                        v
+                        (merge defaults
+                               (get limb-defaults k)
+                               v))))
+             {}
+             pose))
+
 (defn eval-gait
-  "Applies a given gait specification in the current situation.
-   Returns `[actions new-gait-state"
+  "Applies a given gait specification in the current situation and in
+   the given direction (-1 left, 1 right). Returns `[actions
+   new-gait-state]`."
   [me dir gait gait-state t]
   (loop [phase (:phase gait-state 0)
          time-in-phase (- t (:start gait-state 0))]
-    (let [pose (get (:poses gait) phase)]
-      (if-let [actions (eval-gait-phase me dir pose (:defaults gait)
-                                        time-in-phase)]
+    (let [pose (-> (get (:poses gait) phase)
+                   (pose-with-defaults (:limb-defaults gait)
+                                       (:defaults gait)))]
+      (if-let [actions (eval-gait-phase me dir pose time-in-phase)]
         [actions
          {:phase phase, :start (- t time-in-phase)}]
-       (recur (mod (inc phase) (* 2 (count gait)))
-              0.0)))))
+        (recur (mod (inc phase) (count (:poses gait)))
+               0.0)))))
 
 (defn symmetric-gait
   [half-gait symm-map]
@@ -111,14 +119,13 @@
 
 ;; Adapted from Yin et al (2007) SIMBICON.
 (def humanoid-half-walk
-  {:defaults (merge (zipmap humanoid-leg-cmp-ks
-                            (repeat {:speed 8
-                                     :k-d 100
-                                     :k-v 10}))
-                    (zipmap humanoid-arm-cmp-ks
-                            (repeat {:speed 2
-                                     :k-d 40
-                                     :k-v 4})))
+  {:defaults {:speed 8
+              :k-d 100
+              :k-v 10}
+   :limb-defaults (zipmap humanoid-arm-cmp-ks
+                          (repeat {:speed 2
+                                   :k-d 40
+                                   :k-v 4}))
    :poses [{:until {:dt 0.3}
             ;; stance leg
             :leg-a1 {:on-parent :torso, :angle 0.05}
