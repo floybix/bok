@@ -21,7 +21,7 @@
   ""
   [me dir pose time-in-phase]
   (let [components (:components me)
-        joints (:joints me)
+        my-joints (:joints me)
         done? (or
                (when-let [cs (:contact (:until pose))]
                  (some grounded? (map components cs)))
@@ -29,17 +29,14 @@
                  (>= time-in-phase dt)))]
     (when-not done?
       (->>
-       (for [[cmp-k params] (dissoc pose :until)
-             :let [ang-vel (get-in joints [cmp-k :joint-speed])
-                   target-cmp-k (or (:on-parent params) cmp-k)
-                   curr-ang* (cond
-                              (:joint-angle params)
-                              (get-in joints [cmp-k :joint-angle])
-                              (:angle params)
-                              (get-in components [target-cmp-k :angle]))
-                   curr-ang (if (:on-parent params)
-                              (- curr-ang*)
-                              curr-ang*)
+       (for [[jt-k params] (:joints pose)
+             :let [ang-vel (get-in my-joints [jt-k :joint-speed])
+                   cmp-k (or (:on-parent params) jt-k)
+                   curr-ang (cond
+                             (:joint-angle params)
+                             (get-in my-joints [jt-k :joint-angle])
+                             (:angle params)
+                             (get-in components [cmp-k :angle]))
                    adj (if-let [[balance-k c-d c-v] (:balance params)]
                          (+ (* c-d (balance-d me balance-k))
                             (* c-v (x-val (:velocity me))))
@@ -47,24 +44,28 @@
                    target-ang (-> (or (:joint-angle params)
                                       (:angle params))
                                   (* dir)
-                                  (+ adj))]]
-         [cmp-k
-          (turn-towards target-ang curr-ang ang-vel (:speed params)
+                                  (+ adj))
+                   ang-diff (if (:on-parent params)
+                              (- curr-ang target-ang)
+                              (- target-ang curr-ang))]]
+         [jt-k
+          (turn-towards ang-diff 0.0
+                        ang-vel (:speed params)
                         (:k-d params 100) (:k-v params 10))])
        (into {})
        (hash-map :joint-motors)))))
 
 (defn pose-with-defaults
   [pose limb-defaults defaults]
-  (reduce-kv (fn [m k v]
-               (assoc m k
-                      (if (= k :until)
-                        v
-                        (merge defaults
-                               (get limb-defaults k)
-                               v))))
-             {}
-             pose))
+  (update-in pose [:joints]
+             (fn [joints]
+               (reduce-kv (fn [m k v]
+                           (assoc m k
+                                  (merge defaults
+                                         (get limb-defaults k)
+                                         v)))
+                         {}
+                         joints))))
 
 (defn eval-gait
   "Applies a given gait specification in the current situation and in
@@ -92,8 +93,10 @@
                           (:on-parent m)
                           (update-in [:on-parent] opp)))
         opp-pose (fn [pose]
-                   (-> (zipmap (map opp (keys pose))
-                               (map opp-val (vals pose)))
+                   (-> (update-in pose [:joints]
+                                  (fn [joints]
+                                    (zipmap (map opp (keys joints))
+                                            (map opp-val (vals joints)))))
                        (update-in [:until :contact]
                                   #(set (map opp %)))))]
     (update-in half-gait [:poses]
@@ -127,35 +130,38 @@
                                    :k-d 40
                                    :k-v 4}))
    :poses [{:until {:dt 0.3}
-            ;; stance leg
-            :leg-a1 {:on-parent :torso, :angle 0.05}
-            :leg-a2 {:joint-angle -0.05}
-            :leg-a3 {:joint-angle (+ HALF_PI 0.0)}
-            ;; swing leg
-            :leg-b1 {:angle 0.5, :balance [:leg-b2 0.0 0.2]}
-            :leg-b2 {:joint-angle -1.1}
-            :leg-b3 {:joint-angle (+ HALF_PI 0.2)}
-            ;; arms
-            :arm-a1 {:joint-angle 0.3}
-            :arm-a2 {:joint-angle 0.4}
-            :arm-b1 {:joint-angle -0.3}
-            :arm-b2 {:joint-angle 0.4}
+            :joints
+            { ;; stance leg
+             :leg-a1 {:on-parent :torso, :angle -0.05}
+             :leg-a2 {:joint-angle -0.05}
+             :leg-a3 {:joint-angle (+ HALF_PI 0.0)}
+             ;; swing leg
+             :leg-b1 {:angle 0.5, :balance [:leg-b2 0.0 0.2]}
+             :leg-b2 {:joint-angle -1.1}
+             :leg-b3 {:joint-angle (+ HALF_PI 0.2)}
+             ;; arms
+             :arm-a1 {:joint-angle 0.3}
+             :arm-a2 {:joint-angle 0.4}
+             :arm-b1 {:joint-angle -0.3}
+             :arm-b2 {:joint-angle 0.4}}
             }
            {:until {:contact #{:leg-b2 :leg-b3}}
-            ;; stance leg
-            :leg-a1 {:on-parent :torso, :angle 0.05}
-            :leg-a2 {:joint-angle -0.1}
-            :leg-a3 {:joint-angle (+ HALF_PI 0.2)}
-            ;; swing leg
-            :leg-b1 {:angle -0.05, :balance [:leg-b2 2.0 0.0]}
-            :leg-b2 {:joint-angle -0.1}
-            :leg-b3 {:joint-angle (+ HALF_PI 0.0)}
-            ;; arms
-            :arm-a1 {:joint-angle -0.3}
-            :arm-a2 {:joint-angle 0.4}
-            :arm-b1 {:joint-angle 0.3}
-            :arm-b2 {:joint-angle 0.4}
-            }]})
+            :joints
+            { ;; stance leg
+             :leg-a1 {:on-parent :torso, :angle -0.05}
+             :leg-a2 {:joint-angle -0.1}
+             :leg-a3 {:joint-angle (+ HALF_PI 0.2)}
+             ;; swing leg
+             :leg-b1 {:angle -0.05, :balance [:leg-b2 2.0 0.0]}
+             :leg-b2 {:joint-angle -0.1}
+             :leg-b3 {:joint-angle (+ HALF_PI 0.0)}
+             ;; arms
+             :arm-a1 {:joint-angle -0.3}
+             :arm-a2 {:joint-angle 0.4}
+             :arm-b1 {:joint-angle 0.3}
+             :arm-b2 {:joint-angle 0.4}}
+            }
+           ]})
 
 (def humanoid-walk
   (symmetric-gait humanoid-half-walk humanoid-symmetry-map))
