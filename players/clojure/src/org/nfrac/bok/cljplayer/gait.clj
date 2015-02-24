@@ -30,6 +30,7 @@
     (when-not done?
       (->>
        (for [[jt-k params] (:joints pose)
+             :when (seq params)
              :let [ang-vel (get-in my-joints [jt-k :joint-speed])
                    cmp-k (or (:on-parent params) jt-k)
                    curr-ang (cond
@@ -51,7 +52,7 @@
          [jt-k
           (turn-towards ang-diff 0.0
                         ang-vel (:speed params)
-                        (:k-d params 100) (:k-v params 10))])
+                        (:k-p params 100) (:k-d params 10))])
        (into {})
        (hash-map :joint-motors)))))
 
@@ -123,12 +124,12 @@
 ;; Adapted from Yin et al (2007) SIMBICON.
 (def humanoid-half-walk
   {:defaults {:speed 8
-              :k-d 100
-              :k-v 10}
+              :k-p 100
+              :k-d 10}
    :limb-defaults (zipmap humanoid-arm-cmp-ks
                           (repeat {:speed 2
-                                   :k-d 40
-                                   :k-v 4}))
+                                   :k-p 40
+                                   :k-d 4}))
    :poses [{:until {:dt 0.3}
             :joints
             { ;; stance leg
