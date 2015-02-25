@@ -82,7 +82,7 @@
 
 (defmethod build :humanoid
   [type world position group-index]
-  (let [head-pos (v-add position [0 2.9])
+  (let [head-pos (v-add position [0 2.8])
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 5
@@ -134,7 +134,33 @@
 
 (defmethod build :wormoid
   [type world position group-index]
-  (let [head-pos (v-add position [0 3.75])
+  (let [head-pos (v-add position [0 5.3])
+        head (-> (body! world {:position head-pos}
+                        {:shape (circle 0.1)
+                         :density 10
+                         :friction 1
+                         :restitution 0
+                         :group-index group-index})
+                 (set-pois [[0 0]]))
+        limb-spec {:density 10
+                   :friction 1
+                   :restitution 0
+                   :group-index group-index}
+        segs (limb world head head-pos limb-spec
+                   :lengths (repeat 8 0.75) :prefix "seg-"
+                   :widths (repeat 0.2)
+                   ;; first segment is fixed to the head (not revolute)
+                   :joints? (cons false (repeat true)))]
+    (entity (assoc (:components segs)
+              :head head)
+            :joints (:joints segs)
+            :entity-type :creature
+            :creature-type type
+            :group-index group-index)))
+
+(defmethod build :bicycloid
+  [type world position group-index]
+  (let [head-pos (v-add position [0 2.1])
         head (-> (body! world {:position head-pos}
                         {:shape (circle 0.25)
                          :density 10
@@ -146,13 +172,37 @@
                    :friction 1
                    :restitution 0
                    :group-index group-index}
-        segs (limb world head head-pos limb-spec
-                   :lengths (repeat 5 0.75) :prefix "seg-"
-                   ;; first segment is fixed to the head (not revolute)
-                   :joints? (cons false (repeat true)))]
-    (entity (assoc (:components segs)
-              :head head)
-            :joints (:joints segs)
+        limbs (merge-with
+               merge ;; merge nested maps
+               (limb world head head-pos limb-spec
+                     :lengths [1.0 1.0] :prefix "leg-a")
+               (limb world head head-pos limb-spec
+                     :lengths [1.0 1.0] :prefix "leg-b"))
+        wheel-pos (v-add head-pos [0 -1.95])
+        wheels (->> [:wheel-a :wheel-b]
+                    (reduce
+                     (fn [m k]
+                       (let [leg-k (case k
+                                     :wheel-a :leg-a2
+                                     :wheel-b :leg-b2)
+                             leg (get-in limbs [:components leg-k])
+                             wheel (body! world {:position wheel-pos}
+                                        (assoc limb-spec
+                                          :shape (circle 0.15)
+                                          :density 10))
+                             jt (joint! {:type :revolute
+                                         :body-a leg
+                                         :body-b wheel
+                                         :world-anchor wheel-pos})]
+                         (-> m
+                             (assoc-in [:components k] wheel)
+                             (assoc-in [:joints k] jt))))
+                     {}))]
+    (entity (-> (:components limbs)
+                (merge (:components wheels))
+                (assoc :head head))
+            :joints (merge (:joints limbs)
+                           (:joints wheels))
             :entity-type :creature
             :creature-type type
             :group-index group-index)))

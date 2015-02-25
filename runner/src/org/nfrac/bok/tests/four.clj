@@ -18,7 +18,7 @@
                           {:player-a :bipoid
                            :player-b :humanoid
                            :player-c :wormoid
-                           :player-d :bipoid}
+                           :player-d :bicycloid}
                           {})]
     (println "bipoid mass:"
              (-> game :entities :player-a ent/entity-mass))
@@ -26,6 +26,8 @@
              (-> game :entities :player-b ent/entity-mass))
     (println "wormoid mass:"
              (-> game :entities :player-c ent/entity-mass))
+    (println "bicycloid mass:"
+             (-> game :entities :player-d ent/entity-mass))
     (-> game
         (visrun/run-with-display #(runner/step-local % {:player-a action
                                                         :player-b action
