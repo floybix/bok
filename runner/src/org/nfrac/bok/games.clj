@@ -150,8 +150,9 @@
   (let [game (build* game-id players opts)]
     (doseq [[ent-k ent] (:entities game)
             [cmp-k cmp] (:components ent)]
-      (vary-user-data cmp #(assoc % :org.nfrac.bok/entity ent-k
-                                  :org.nfrac.bok/component cmp-k)))
+      (vary-user-data cmp assoc
+                      :org.nfrac.bok/entity ent-k
+                      :org.nfrac.bok/component cmp-k))
     (cond->
      (assoc game
        :game-id game-id

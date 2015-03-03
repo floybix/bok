@@ -10,7 +10,7 @@
 
 (defn set-pois
   [body pois]
-  (vary-user-data body #(assoc % :points-of-interest pois)))
+  (vary-user-data body assoc :points-of-interest pois))
 
 (defn entity
   [components & {:keys [entity-type]
