@@ -6,16 +6,17 @@
             [clojure.pprint :refer [pprint]]))
 
 ;; max torque
-(def MT 100.0)
+(def MT 50.0)
 
 (defn action
   [info]
   (let [{:keys [entities my-key other-players]} info
         me (get entities my-key)
         {:keys [head leg-a1 leg-a2 leg-b1 leg-b2]} (:components me)]
-    {:joint-motors {:leg-b1 [(* 10 (- 2.0 (:angle leg-b1))) MT]
-                    :leg-a2 [(* 10 (- -0.6 (:angle leg-a2))) MT]
-                    :leg-b2 [(* 10 (- 0.6 (:angle leg-b2))) MT]}}))
+    {:joint-motors {:leg-a1 [(* 5 (- -2.0 (:angle leg-a1))) MT]
+                    :leg-b1 [(* 5 (- 2.0 (:angle leg-b1))) MT]
+                    :leg-a2 [(* 5 (- -0.6 (:angle leg-a2))) MT]
+                    :leg-b2 [(* 5 (- 0.6 (:angle leg-b2))) MT]}}))
 
 (defn -main
   "Run the test sketch."

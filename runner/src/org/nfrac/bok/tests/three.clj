@@ -1,4 +1,4 @@
-(ns org.nfrac.bok.tests.four
+(ns org.nfrac.bok.tests.three
   (:require [org.nfrac.bok.games :as games]
             [org.nfrac.bok.game-arenas] ;; load games
             [org.nfrac.bok.visual-runner :as visrun]
@@ -17,8 +17,7 @@
         game (games/build arena-type
                           {:player-a :bipoid
                            :player-b :humanoid
-                           :player-c :wormoid
-                           :player-d :bicycloid}
+                           :player-c :wormoid}
                           {})]
     (println "bipoid mass:"
              (-> game :entities :player-a ent/entity-mass))
@@ -26,12 +25,9 @@
              (-> game :entities :player-b ent/entity-mass))
     (println "wormoid mass:"
              (-> game :entities :player-c ent/entity-mass))
-    (println "bicycloid mass:"
-             (-> game :entities :player-d ent/entity-mass))
     (-> game
         (visrun/run-with-display #(runner/step-local % {:player-a action
                                                         :player-b action
-                                                        :player-c action
-                                                        :player-d action}))
+                                                        :player-c action}))
         :final-result
         pprint)))

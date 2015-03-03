@@ -53,33 +53,6 @@
     {:components (into {} (map (juxt :key :component) segs))
      :joints (into {} (map (juxt :key :joint) (filter :joint segs)))}))
 
-(defmethod build :bipoid
-  [type world position group-index]
-  (let [head-pos (v-add position [0 2.0])
-        head (-> (body! world {:position head-pos}
-                        {:shape (circle 0.25)
-                         :density 10
-                         :friction 1
-                         :restitution 0
-                         :group-index group-index})
-                 (set-pois [[0 0]]))
-        limb-spec {:density 20
-                   :friction 1
-                   :restitution 0
-                   :group-index group-index}
-        limbs (merge-with
-               merge ;; merge nested maps
-               (limb world head head-pos limb-spec
-                     :lengths [1.0 1.0] :prefix "leg-a" :joints? [false true])
-               (limb world head head-pos limb-spec
-                     :lengths [1.0 1.0] :prefix "leg-b"))]
-    (entity (assoc (:components limbs)
-              :head head)
-            :joints (:joints limbs)
-            :entity-type :creature
-            :creature-type type
-            :group-index group-index)))
-
 (defmethod build :humanoid
   [type world position group-index]
   (let [head-pos (v-add position [0 2.8])
@@ -158,7 +131,7 @@
             :creature-type type
             :group-index group-index)))
 
-(defmethod build :bicycloid
+(defmethod build :bipoid
   [type world position group-index]
   (let [head-pos (v-add position [0 2.1])
         head (-> (body! world {:position head-pos}

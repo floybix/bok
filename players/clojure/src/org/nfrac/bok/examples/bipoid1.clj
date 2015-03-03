@@ -27,9 +27,12 @@
         BRACE -0.5
         actions
         {:joint-motors
-         {:leg-b1 [(* -5 dir) MT]
+         {:leg-a1 [0 MT]
+          :leg-b1 [(* -5 dir) MT]
           :leg-a2 (turn-towards (* dir BRACE) (:angle leg-a2) 0 30)
           :leg-b2 (turn-towards (* dir BRACE) (:angle leg-b2) 0 30)
+          :wheel-a [0 MT]
+          :wheel-b [0 MT]
           }}]
     (assoc state
       :actions actions)))
