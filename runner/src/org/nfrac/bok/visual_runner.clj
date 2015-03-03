@@ -2,12 +2,11 @@
   (:require [org.nfrac.bok.runner :as runner :refer [PLAYER_KEYS]]
             [org.nfrac.bok.entities :as ent]
             [org.nfrac.cljbox2d.core :refer [position center angle user-data
-                                             body-a body-b anchor-a radius
-                                             fixture-of vary-user-data]]
+                                             body-a body-b anchor-a radius]]
             [org.nfrac.cljbox2d.vec2d :refer [v-dist v-add polar-xy v-scale
                                               v-sub v-angle v-mag abs]]
             [org.nfrac.cljbox2d.testbed :as bed]
-            [quil.core :as quil]
+            [quil.core :as quil :refer [color fill stroke]]
             [quil.middleware])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]))
 
@@ -16,27 +15,41 @@
   (/ (reduce + xs)
      (count xs)))
 
-(defn colors*
-  []
-  {:background (quil/color 200 200 160)
-   :text (quil/color 0 0 0)
-   :static (quil/color 128 0 0)
-   :kinematic (quil/color 128 0 0)
-   :dynamic (quil/color 128 64 0)
-   :joint (quil/color 64 0 64)
-   :poi (quil/color 255 255 255)
-   :com (quil/color 0 255 0)
-   :gun (quil/color 64 0 32)
-   :raycast (quil/color 100 100 100)
-   :winner (quil/color 180 180 180)
-   :loser (quil/color 64 64 64)})
+(defn styler
+  ([k]
+     (case k
+       :text (fill (color 0 0 0))
+       :joint (fill (color 64 0 64))
+       :background (do (fill (color 200 200 160))
+                       (quil/no-stroke))
+       :poi (do (fill (color 255 255 255))
+                (stroke (color 0 0 0)))
+       :com (stroke (color 0 255 0))
+       :gun (stroke (color 64 0 32))
+       :raycast (stroke (color 100 100 100) 128)
+       :winner (do (fill (color 200 200 200))
+                   (stroke (color 0 0 0)))
+       :loser (do (fill (color 100 100 100))
+                  (stroke (color 0 0 0)))))
+  ([type ud]
+     (cond
+      (:vortex? ud) (do (fill (color 64 0 64))
+                        (quil/no-stroke))
+      :else
+      (case type
+        :static (do (fill (unchecked-int 0xFFa46450))
+                    (stroke (color 128 0 0)))
+        :kinematic (do (fill (color 128 64 0) 128)
+                       (stroke (color 128 64 0)))
+        :dynamic (do (fill (unchecked-int 0xFF997b4b))
+                     (stroke (color 128 64 0)))))))
 
 (defn draw-additional
-  [scene camera colors]
+  [scene camera style!]
   (let [->px (bed/world-to-px-fn camera)
         px-scale (bed/world-to-px-scale camera)]
     ;; raycasts
-    (quil/stroke (:raycast colors) 128)
+    (style! :raycast)
     (doseq [[player-key rc] (:player-raycast scene)
             :when rc
             :let [head (get-in scene [:bodies player-key :head])
@@ -47,7 +60,7 @@
           (doseq [i (range 0 (quot rc-length-px 8) 2)]
             (quil/line [(* i 8) 0] [(* (inc i) 8) 0])))))
     ;; guns
-    (quil/stroke (:gun colors))
+    (style! :gun)
     (quil/stroke-weight 2)
     (doseq [[player-key gun-info] (:player-gun scene)
             :let [head (get-in scene [:bodies player-key :head])
@@ -74,12 +87,8 @@
     ;; if game over, highlight winner vs others
     (when-let [winner (:winner (:final-result scene))]
       (doseq [player-key (:player-keys scene)
-              :let [color (if (= player-key winner)
-                            (:winner colors)
-                            (:loser colors))
-                    bodies (vals (get-in scene [:bodies player-key]))]]
-        (quil/stroke 0)
-        (quil/fill color)
+              :let [bodies (vals (get-in scene [:bodies player-key]))]]
+        (style! (if (= player-key winner) :winner :loser))
         (doseq [body-snap bodies]
           (bed/draw-body body-snap ->px px-scale))))))
 
@@ -101,12 +110,12 @@
          (+ 1 (apply max (map second pts)))]))))
 
 (defn draw-details
-  [game detail-level colors]
+  [game detail-level style!]
   (let [camera (:camera game)
         ->px (bed/world-to-px-fn camera)
         px-scale (bed/world-to-px-scale camera)]
     ;; details, labels
-    (quil/fill (:text colors))
+    (style! :text)
     (when (zero? detail-level)
       (quil/text "Press d to show details, f to follow players." 10 10))
     (when (pos? detail-level)
@@ -122,7 +131,7 @@
                   (> detail-level 1))
           ;; label the entity
           (quil/text-align :center)
-          (quil/fill (:text colors))
+          (style! :text)
           (quil/text (name ent-key)
                      labx laby))
         ;; when detail-level in [3-5], draw all points of interest
@@ -132,8 +141,7 @@
         (when (<= 3 detail-level 5)
           (doseq [[cmp-key body] components]
             ;; draw the points of interest
-            (quil/stroke (:text colors))
-            (quil/fill (:poi colors))
+            (style! :poi)
             (doseq [pt (:points-of-interest (user-data body))
                     :let [[x y] (->px (position body pt))
                           r-px (* px-scale 0.1)]]
@@ -142,14 +150,14 @@
               (when (or (not (contains? (:player-keys game) ent-key))
                         (>= detail-level 4))
                 ;; label the components
-                (quil/fill (:text colors))
+                (style! :text)
                 (quil/with-translation (->px (center body))
                   (quil/with-rotation [(- (angle body))]
                     (quil/text (name cmp-key)
                                0 0)))))))
         ;; center of mass
         (when (= 5 detail-level)
-          (quil/stroke (:com colors))
+          (style! :com)
           (quil/with-translation (->px com)
             (quil/with-rotation [(- (v-angle comv))]
               (let [z (* px-scale (v-mag comv))]
@@ -166,13 +174,13 @@
                         body-b (body-b jt)
                         ang (v-angle (v-sub (center body-b) anch))
                         radius-px (* 2 px-scale (v-dist (center body-b) anch))]]
-            (quil/stroke (:joint colors))
-            (quil/fill (:joint colors) 64)
+            (style! :joint)
+            (quil/fill (quil/current-stroke) 64)
             (let [[x y] (->px anch)]
               (quil/arc x y (* 2 radius-px) (* 2 radius-px)
                         (- 0 ang 0.5)
                         (- 0 ang)))
-            (quil/fill (:text colors))
+            (style! :text)
             (quil/with-translation (->px anch)
               (quil/with-rotation [(- 0 ang 0.25)]
                 (quil/text (name jt-key)
@@ -181,14 +189,13 @@
 
 (defn draw
   [game]
-  (let [colors (colors*)]
-    ;; standard drawing
-    (bed/draw (assoc game ::bed/colors colors))
-    (let [{:keys [world snapshots steps-back time camera]} game
-          scene (nth snapshots steps-back nil)
-          detail-level (::detail-level game 0)]
-      (draw-additional scene camera colors)
-      (draw-details game detail-level colors))))
+  ;; standard drawing
+  (bed/draw (assoc game ::bed/styler styler))
+  (let [{:keys [world snapshots steps-back time camera]} game
+        scene (nth snapshots steps-back nil)
+        detail-level (::detail-level game 0)]
+    (draw-additional scene camera styler)
+    (draw-details game detail-level styler)))
 
 (defn key-press
   "Standard actions for key events"

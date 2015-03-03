@@ -407,6 +407,7 @@
 
 (defn vortex-game
   [world entities players starting-pts vortex-body]
+  (vary-user-data vortex-body assoc :vortex? true)
   (->
    (assoc empty-game
      :game-type :vortex

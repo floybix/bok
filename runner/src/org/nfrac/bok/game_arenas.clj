@@ -544,9 +544,7 @@
         vortex (simple-entity
                 [[0 0]]
                 (body! world {:type :static
-                              :position [0 0]
-                              :user-data {:org.nfrac.cljbox2d.testbed/rgb
-                                          [64 0 64]}}
+                              :position [0 0]}
                        {:shape (circle 1.0)}))
         entities (into {:left-wall left-wall
                         :right-wall right-wall
