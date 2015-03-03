@@ -172,8 +172,11 @@
                   :let [anch (anchor-a jt)
                         body-a (body-a jt)
                         body-b (body-b jt)
-                        ang (v-angle (v-sub (center body-b) anch))
-                        radius-px (* 2 px-scale (v-dist (center body-b) anch))]]
+                        radius (v-dist (center body-b) anch)
+                        radius-px (* 2 px-scale radius)
+                        ang (if (< radius 0.02)
+                              (angle body-b)
+                              (v-angle (v-sub (center body-b) anch)))]]
             (style! :joint)
             (quil/fill (quil/current-stroke) 64)
             (let [[x y] (->px anch)]

@@ -6,9 +6,12 @@
             [org.nfrac.bok.entities :as ent]
             [clojure.pprint :refer [pprint]]))
 
+(def MT 100)
+
 (defn action
   [info]
-  {})
+  {:joint-motors {:wheel-a [0 MT]
+                  :wheel-b [0 MT]}})
 
 (defn -main
   "Run the test sketch."
