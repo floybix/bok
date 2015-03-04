@@ -6,7 +6,7 @@
                      body! destroy! box apply-impulse!
                      contacting all-current-contacts
                      set-buffering-contact-listener!
-                     v2xy linear-velocity! gravity-scale!
+                     linear-velocity! gravity gravity-scale!
                      apply-force! loc-center]]
             [org.nfrac.cljbox2d.vec2d
              :refer [v-add v-sub polar-xy v-scale]]))
@@ -176,7 +176,7 @@
     (cond->
      (assoc game
        :game-id game-id
-       :gravity (v2xy (.getGravity (:world game))))
+       :gravity (gravity (:world game)))
      ;; allow options map to override the game timeout
      (contains? opts :game-over-secs)
      (assoc :game-over-secs (:game-over-secs opts)))))
