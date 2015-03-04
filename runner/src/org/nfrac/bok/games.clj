@@ -18,6 +18,7 @@
      game-version
      game-type
      world
+     contact-buffer
      entities
      player-keys
      dead-players
@@ -30,17 +31,30 @@
      ;; method implementations
      perceive
      act
-     world-step
+     game-step
      check-end])
 
 ;; =============================================================================
 ;; ## default method implementations
+
+(defn contacts-by-body
+  [contacts]
+  (->> contacts
+       (reduce (fn [m cd]
+                 (let [body-a (body-of (:fixture-a cd))
+                       body-b (body-of (:fixture-b cd))
+                       m1 (assoc! m body-a (conj (get m body-a []) cd))
+                       m2 (assoc! m1 body-b (conj (get m1 body-b []) cd))]
+                   m2))
+               (transient {}))
+       (persistent!)))
 
 (defn perceive
   [game player-key]
   (let [inv-dt (/ 1 (:dt-secs game))
         me (get-in game [:entities player-key])
         other-players (disj (:player-keys game) player-key)
+        body->contacts (contacts-by-body (deref (:contact-buffer game)))
         obs (->> (:entities game)
                  (map (fn [[k ent]]
                         ;; filter out perception of other players if out of sight
@@ -49,7 +63,8 @@
                                                           player-key ent k)))
                           nil
                           ;; otherwise - normal perception
-                          [k (ent/perceive-entity ent inv-dt (= k player-key))])))
+                          [k (ent/perceive-entity ent inv-dt (= k player-key)
+                                                  body->contacts)])))
                  (into {}))]
     {:game-type (:game-type game)
      :gravity (:gravity game)
@@ -74,6 +89,7 @@
 
 (defn world-step
   [game]
+  (swap! (:contact-buffer game) empty)
   (-> game
       (update-in [:world] step! (:dt-secs game))
       (update-in [:time] + (:dt-secs game))))
@@ -91,7 +107,8 @@
 
 ;; =============================================================================
 
-(def empty-game
+(defn empty-game
+  [world]
   (map->Game
    {:entities {}
     :player-keys #{}
@@ -99,10 +116,13 @@
     :time 0.0
     :dt-secs (/ 1 32.0)
     :game-over-secs 60.0
+    :world world
+    ;; need this for perception of contact impulses (pressure sensor)
+    :contact-buffer (set-buffering-contact-listener! world)
     ;; default method implementations
     :perceive perceive
     :act act
-    :world-step world-step
+    :game-step world-step
     :check-end check-dead-or-time-limit}))
 
 (defn add-players
@@ -167,10 +187,9 @@
 ;; Players die if they fall below the death level. Last player
 ;; remaining is the winner.
 
-(defn sumo-step
+(defn eliminate-fallen
   [game death-level]
-  (let [game (world-step game)
-        dead (filter (fn [player-key]
+  (let [dead (filter (fn [player-key]
                        (let [player (get-in game [:entities player-key])
                              head (-> player :components :head)
                              [x y] (position head)]
@@ -184,12 +203,13 @@
 (defn sumo-game
   [world entities players starting-pts death-level]
   (->
-   (assoc empty-game
-     :game-type :sumo
-     :world world
-     :entities entities
-     :world-step (fn [game]
-                   (sumo-step game death-level)))
+   (empty-game world)
+   (assoc
+       :game-type :sumo
+       :entities entities
+       :game-step (fn [game]
+                    (-> (world-step game)
+                        (eliminate-fallen death-level))))
    (add-players players starting-pts)))
 
 ;; =============================================================================
@@ -216,11 +236,11 @@
 (defn altitude-game
   [world entities players starting-pts]
   (->
-   (assoc empty-game
-     :game-type :altitude
-     :world world
-     :entities entities
-     :check-end check-highest)
+   (empty-game world)
+   (assoc
+       :game-type :altitude
+       :entities entities
+       :check-end check-highest)
    (add-players players starting-pts)))
 
 ;; =============================================================================
@@ -237,47 +257,55 @@
       {:winner winner
        :energy (:player-energy game)})))
 
-(defn energy-race-step
+(defn dislodge-touched-food
+  "If any food particles are touched, dislodge them - switch on gravity."
+  [game]
+  (doseq [cd (all-current-contacts (:world game))
+          fixt [(:fixture-a cd) (:fixture-b cd)]
+          :let [body (body-of fixt)]]
+    (when (:food-joules (user-data body))
+      (gravity-scale! body 1.0)))
+  game)
+
+(defn energy-accounting
   [game]
   (let [world (:world game)]
-    ;; if any food is touched, dislodge it - switch on its gravity
-   (doseq [cd (all-current-contacts world)
-           fixt [(:fixture-a cd) (:fixture-b cd)]
-           :let [body (body-of fixt)]]
-     (when (:food-joules (user-data body))
-       (gravity-scale! body 1.0)))
-   ;; do energy accounting
-   (-> (reduce
-        (fn [game player-key]
-          (let [me (get-in game [:entities player-key])
-                e-loss (ent/entity-work-joules me (:dt-secs game))
-                head (get-in me [:components :head])
-                snack (first (filter (comp :food-joules user-data)
-                                     (contacting head)))
-                snack-k (when snack (:org.nfrac.bok/entity (user-data snack)))
-                e-gain (if snack (:food-joules (user-data snack)) 0)
-                energy (+ (get-in game [:player-energy player-key])
-                          (- e-gain e-loss))]
-            (when snack
-              (destroy! snack))
-            (-> (if snack
-                  (update-in game [:entities] dissoc snack-k)
-                  game)
-                (update-in [:player-energy] assoc player-key energy))))
-        game
-        (:player-keys game))
-       (world-step))))
+    (reduce
+     (fn [game player-key]
+       (let [me (get-in game [:entities player-key])
+             e-loss (ent/entity-work-joules me (:dt-secs game))
+             head (get-in me [:components :head])
+             snack (first (filter (comp :food-joules user-data)
+                                  (contacting head)))
+             snack-k (when snack (:org.nfrac.bok/entity (user-data snack)))
+             e-gain (if snack (:food-joules (user-data snack)) 0)
+             energy (+ (get-in game [:player-energy player-key])
+                       (- e-gain e-loss))]
+         (when snack
+           (destroy! snack))
+         (-> (if snack
+               (update-in game [:entities] dissoc snack-k)
+               game)
+             (update-in [:player-energy] assoc player-key energy))))
+     game
+     (:player-keys game))))
 
 (defn energy-race-game
   [world entities players starting-pts]
   (->
-   (assoc empty-game
-     :game-type :energy-race
-     :world world
-     :entities entities
-     :player-energy (zipmap (keys players) (repeat 300.0))
-     :world-step energy-race-step
-     :check-end check-max-energy)
+   (empty-game world)
+   (assoc
+       :game-type :energy-race
+       :entities entities
+       :player-energy (zipmap (keys players) (repeat 300.0))
+       :game-step (fn [game]
+                    (-> game
+                        ;; destroying bodies, if we do it before perception
+                        ;; then the data will refer to those missing bodies.
+                        (dislodge-touched-food)
+                        (energy-accounting)
+                        (world-step)))
+       :check-end check-max-energy)
    (add-players players starting-pts)))
 
 
@@ -297,11 +325,9 @@
 (def GUN_AMMO 50)
 (def GUN_RELOAD 2) ;; seconds
 
-(defn hunt-act
+(defn gun-act
   [game player-key actions]
-  ;; process usual actions first
-  (let [game (act game player-key actions)
-        world (:world game)
+  (let [world (:world game)
         gun-info (get-in game [:player-gun player-key])
         ang (:angle gun-info)]
     (if (and (:fire (:gun actions))
@@ -336,18 +362,16 @@
             (update-in [:player-gun player-key :reload-countdown]
                        #(max 0 (- % dt))))))))
 
-(defn hunt-step
+(defn eliminate-shot
   [game]
-  ;; do standard step first:
-  (let [game (world-step game)
-        contacts (:buffered-contacts game)
+  (let [contacts (deref (:contact-buffer game))
         hits (keep (fn [{:keys [fixture-a fixture-b]}]
                      (cond
                       (::bullet-of (user-data fixture-a))
                       [fixture-a fixture-b]
                       (::bullet-of (user-data fixture-b))
                       [fixture-b fixture-a]))
-                   @contacts)
+                   contacts)
         dead (distinct
               (keep (fn [[_ target-fixt]]
                       (->> (body-of target-fixt)
@@ -357,7 +381,6 @@
                     hits))]
     (doseq [[bullet-fixt _] hits]
       (destroy! (body-of bullet-fixt)))
-    (swap! contacts empty)
     (if (seq dead)
       (update-in game [:dead-players] into dead)
       game)))
@@ -365,17 +388,21 @@
 (defn hunt-game
   [world entities players starting-pts]
   (->
-   (assoc empty-game
-     :game-type :hunt
-     :world world
-     :entities entities
-     :player-gun (zipmap (keys players)
-                         (repeat {:angle 0.0
-                                  :ammo GUN_AMMO
-                                  :reload-countdown GUN_RELOAD}))
-     :buffered-contacts (set-buffering-contact-listener! world)
-     :act hunt-act
-     :world-step hunt-step)
+   (empty-game world)
+   (assoc
+       :game-type :hunt
+       :entities entities
+       :player-gun (zipmap (keys players)
+                           (repeat {:angle 0.0
+                                    :ammo GUN_AMMO
+                                    :reload-countdown GUN_RELOAD}))
+       :act (fn [game player-key actions]
+              (-> game
+                  (act player-key actions)
+                  (gun-act player-key actions)))
+       :game-step (fn [game]
+                    (-> (world-step game)
+                        (eliminate-shot))))
    (add-players players starting-pts)))
 
 ;; =============================================================================
@@ -384,9 +411,9 @@
 ;; Winner is last remaining player. Players are killed if they touch
 ;; the vortex body. There is a small suction force towards the vortex.
 
-(defn vortex-step
+(defn apply-suction
+  "Apply suction force towards vortex."
   [game vortex-body]
-  ;; apply suction force towards vortex
   (let [vort-pos (position vortex-body)]
     (doseq [k (:player-keys game)
             body (vals (get-in game [:entities k :components]))
@@ -394,11 +421,13 @@
                   force (-> (v-sub vort-pos pos)
                             (v-scale)
                             (v-scale 0.5))]]
-      (apply-force! body force (loc-center body))))
-  ;; do standard step
-  (let [game (world-step game)
-        ;; kill players touching vortex
-        player-keys (:player-keys game)
+      (apply-force! body force (loc-center body)))
+    game))
+
+(defn eliminate-vortexed
+  "Kill players touching vortex."
+  [game vortex-body]
+  (let [player-keys (:player-keys game)
         dead (distinct
               (map (comp player-keys :org.nfrac.bok/entity user-data)
                    (contacting vortex-body)))]
@@ -410,10 +439,12 @@
   [world entities players starting-pts vortex-body]
   (vary-user-data vortex-body assoc :vortex? true)
   (->
-   (assoc empty-game
-     :game-type :vortex
-     :world world
-     :entities entities
-     :world-step (fn [game]
-                   (vortex-step game vortex-body)))
+   (empty-game world)
+   (assoc
+       :game-type :vortex
+       :entities entities
+       :game-step (fn [game]
+                    (-> (world-step game)
+                        (apply-suction vortex-body)
+                        (eliminate-vortexed vortex-body))))
    (add-players players starting-pts)))

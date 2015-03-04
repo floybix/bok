@@ -108,10 +108,10 @@
 
 (defn step-remote
   [game]
-  (let [world-step (:world-step game)]
+  (let [game-step (:game-step game)]
     (try
       (-> game
-          (world-step)
+          (game-step)
           (take-remote-actions)
           (record-scene))
       (catch ZMQException e
@@ -119,9 +119,9 @@
 
 (defn step-local
   [game action-fns]
-  (let [world-step (:world-step game)]
+  (let [game-step (:game-step game)]
     (-> game
-        (world-step)
+        (game-step)
         (take-actions action-fns)
         (record-scene))))
 

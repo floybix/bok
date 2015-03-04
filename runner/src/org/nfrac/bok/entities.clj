@@ -98,18 +98,20 @@
                 (linear-velocity body poi)))
 
 (defn sense-contacts
-  [body]
+  [body contacts]
   (map (fn [cd]
          (let [other (if (= body (body-of (:fixture-a cd)))
                        (body-of (:fixture-b cd))
                        (body-of (:fixture-a cd)))]
            {:entity (:org.nfrac.bok/entity (user-data other))
             :points (:points cd)
-            :normal (:normal cd)}))
-       (current-contacts body)))
+            :normal (:normal cd)
+            :normal-impulses (:normal-impulses cd)
+            :tangent-impulses (:tangent-impulses cd)}))
+       contacts))
 
 (defn observe-components
-  [entity self?]
+  [entity self? body->contacts]
   (reduce-kv (fn [m k body]
                (let [pois (:points-of-interest (user-data body))
                      info {:angle (angle body)
@@ -117,8 +119,10 @@
                            :points (for [poi pois]
                                      (point-state body poi))}]
                  (assoc m k
-                        (if-let [cs (and self? (seq (sense-contacts body)))]
-                          (assoc info :contacts cs)
+                        (if-let [cs (when self?
+                                      (seq (body->contacts body)))]
+                          (assoc info :contacts
+                                 (sense-contacts body cs))
                           info))))
              {}
              (:components entity)))
@@ -154,10 +158,10 @@
         (= other-id hit-ent-id))))
 
 (defn perceive-entity
-  [entity inv-dt self?]
+  [entity inv-dt self? body->contacts]
   (cond->
    {:type (:entity-type entity)
-    :components (observe-components entity self?)
+    :components (observe-components entity self? body->contacts)
     :center-of-mass (entity-center-of-mass entity)
     :velocity (entity-velocity entity)
     :ang-vel (entity-angular-velocity entity)}
