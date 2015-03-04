@@ -26,7 +26,7 @@
                 (stroke (color 0 0 0)))
        :com (stroke (color 0 255 0))
        :gun (stroke (color 64 0 32))
-       :raycast (stroke (color 100 100 100) 128)
+       :raycast (stroke (color 100 100 100) 64)
        :winner (do (fill (color 200 200 200))
                    (stroke (color 0 0 0)))
        :loser (do (fill (color 100 100 100))
@@ -50,10 +50,10 @@
         px-scale (bed/world-to-px-scale camera)]
     ;; raycasts
     (style! :raycast)
-    (doseq [[player-key rc] (:player-raycast scene)
-            :when rc
-            :let [head (get-in scene [:bodies player-key :head])
-                  rc-length-px (* px-scale (or (:distance rc) 50.0))]]
+    (doseq [[player-key rcs] (:player-raycast scene)
+            :let [head (get-in scene [:bodies player-key :head])]
+            rc rcs
+            :let [rc-length-px (* px-scale (or (:distance rc) 50.0))]]
       (quil/with-translation (->px (:position head))
         (quil/with-rotation [(- (:angle rc))]
           ;; dashed line

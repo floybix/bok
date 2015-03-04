@@ -125,36 +125,24 @@
 (def down-right (* PI -0.2))
 
 (defn upward-check
-  "Helps to work out which direction to go in to get higher up. `rc`
-   is the raycast perception data, and `prev-state` is this function's
-   result from the previous time step. Returns keys
+  "Helps to work out which direction to go in to get higher up. `rcs`
+   is the raycast perception data, assumed to include angles down-left
+   and down-right. Returns keys
 
    * `:dir` - which direction seems to be upwards: -1 left, 1 right, 0
      not yet determined.
 
-   * `:next-rc` - the angle for the next raycast."
-  [rc prev-state]
-  (if-not rc
-    ;; initialisation
-    (assoc prev-state
-      :next-rc down-left
-      :dir 0)
-    (let [a (:angle rc)
-          left (if (angle-left? a)
-                 (or (:distance rc) 100)
-                 (:left prev-state))
-          right (if (not (angle-left? a))
-                  (or (:distance rc) 100)
-                  (:right prev-state))]
-      (assoc prev-state
-        :left left
-        :right right
-        ;; alternate raycast side
-        :next-rc (if (angle-left? a)
-                   down-right
-                   down-left)
-        ;; if left distance is lower (i.e. left is upwards), go there.
-        :dir (if (and left right)
-               (if (< left right) -1 1)
-               ;; return dir 0 if raycasts not completed yet
-               0)))))
+   * `:next-angles` - the angles for the next raycast."
+  [rcs]
+  (let [left-rc (first (filter #(< (abs (- down-left (:angle %))) 0.5) rcs))
+        right-rc (first (filter #(< (abs (- down-right (:angle %))) 0.5) rcs))
+        left (when left-rc (or (:distance left-rc) 100))
+        right (when right-rc (or (:distance right-rc) 100))]
+    {:left left
+     :right right
+     :next-angles [down-left down-right]
+     ;; if left distance is lower (i.e. left is upwards), go there.
+     :dir (if (and left right)
+            (if (< left right) -1 1)
+            ;; return dir 0 if raycasts not completed yet
+            0)}))

@@ -170,24 +170,25 @@
 
 (defn raycast-perception
   [world me my-id rc-action]
-  (when-let [ang rc-action]
+  (when rc-action
     (let [eye (-> me :components :head position)
-          extent 50.0
-          ;; start from back of head to improve raycast reliability when close
-          from (v-add eye (polar-xy -0.25 ang))
-          to (v-add eye (polar-xy extent ang))
-          rc (first
-              (raycast world from to :closest
-                       :ignore (fn [fixt]
-                                 (let [id (-> fixt body-of user-data
-                                              :org.nfrac.bok/entity)]
-                                   ;; might be nil for extras, like bullets
-                                   (or (nil? id) (= id my-id))))))
-          hit-ent-id (when rc
-                       (-> rc :fixture body-of user-data :org.nfrac.bok/entity))]
-      {:angle ang
-       :entity hit-ent-id
-       :distance (when rc (float (* (:fraction rc) extent)))})))
+          extent 50.0]
+      (for [ang rc-action]
+        ;; start from back of head to improve raycast reliability when close
+        (let [from (v-add eye (polar-xy -0.25 ang))
+              to (v-add eye (polar-xy extent ang))
+              rc (first
+                  (raycast world from to :closest
+                           :ignore (fn [fixt]
+                                     (let [id (-> fixt body-of user-data
+                                                  :org.nfrac.bok/entity)]
+                                       ;; might be nil for extras, like bullets
+                                       (or (nil? id) (= id my-id))))))
+              hit-ent-id (when rc
+                           (-> rc :fixture body-of user-data :org.nfrac.bok/entity))]
+          {:angle ang
+           :entity hit-ent-id
+           :distance (when rc (float (* (:fraction rc) extent)))})))))
 
 (def MAX_TORQUE 200.0)
 

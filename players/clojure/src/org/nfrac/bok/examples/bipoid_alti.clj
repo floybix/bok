@@ -21,7 +21,7 @@
         {:keys [head leg-a1 leg-a2 leg-b1 leg-b2]} (:components me)
         eye (first (:points head))
         ;; look up and compare raycast distances to decide direction
-        upward (upward-check (:raycast (:current state)) (:upward state))
+        upward (upward-check (:raycast (:current state)))
         dir (:dir upward)
         BRACE -0.7
         actions
@@ -34,8 +34,7 @@
           :wheel-b [(* -8 dir) MT]
           }}]
     (assoc state
-      :actions (assoc actions :raycast (:next-rc upward))
-      :upward upward)))
+      :actions (assoc actions :raycast (:next-angles upward)))))
 
 (defn main
   "For REPL use. Pass an `(atom {})` for peeking at the state."

@@ -16,7 +16,7 @@
                   :leg-b2 [0 MT]
                   :wheel-a [-5 MT]
                   :wheel-b [-5 MT]}
-   :raycast 0
+   :raycast [0 Math/PI]
    :gun {:fire true
          :speed 1}})
 

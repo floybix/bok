@@ -14,7 +14,7 @@
                   :seg-3 [0 MT]
                   :seg-5 [5 MT]
                   :seg-7 [5 MT]}
-   :raycast Math/PI
+   :raycast [-2.9 -3.0 -3.1 -3.2]
    :gun {:fire true
          :speed 1}})
 
