@@ -117,7 +117,8 @@
     ;; details, labels
     (style! :text)
     (when (zero? detail-level)
-      (quil/text "Press d to show details, f to follow players." 10 10))
+      (quil/text (str "Press d to show details, f to follow players, "
+                      "! to run fast.") 10 10))
     (when (pos? detail-level)
       (doseq [[ent-key ent] (:entities game)
               :let [{:keys [components joints]} ent
@@ -192,13 +193,15 @@
 
 (defn draw
   [game]
-  ;; standard drawing
-  (bed/draw (assoc game ::bed/styler styler))
-  (let [{:keys [world snapshots steps-back time camera]} game
-        scene (nth snapshots steps-back nil)
-        detail-level (::detail-level game 0)]
-    (draw-additional scene camera styler)
-    (draw-details game detail-level styler)))
+  (when (or (not (::fast? game))
+            (< (mod (:time game) 3.0) (:dt-secs game)))
+    ;; standard drawing
+    (bed/draw (assoc game ::bed/styler styler))
+    (let [{:keys [world snapshots steps-back time camera]} game
+          scene (nth snapshots steps-back nil)
+          detail-level (::detail-level game 0)]
+      (draw-additional scene camera styler)
+      (draw-details game detail-level styler))))
 
 (defn key-press
   "Standard actions for key events"
@@ -209,9 +212,14 @@
     \f (update-in state [::follow-idx]
                   (fn [i] (-> (inc (or i 0))
                              (mod (inc (count (:player-keys state)))))))
-    \q (do
-         (quil/exit)
-         (assoc state :error "User quit."))
+    \! (if (::fast? state)
+         (do
+           (quil/frame-rate (/ (:dt-secs state)))
+           (dissoc state ::fast?))
+         (do
+           (quil/frame-rate 300)
+           (assoc state ::fast? true)))
+    \q (assoc state :error "User quit" :paused? false)
     (bed/key-press state event)))
 
 (defn camera-follow
@@ -255,7 +263,7 @@
 (defn gui-step
   [game step]
   (if (:paused? game)
-    game
+    (camera-follow game)
     (let [game (-> (step game)
                    (camera-follow)
                    (record-snapshot)
@@ -263,8 +271,9 @@
                           :paused? (:stepping? game)))]
       (if-let [res (:final-result game)]
         ;; game has already ended
-        (if (> (:time game)
-               (+ CONTINUE_SECS (:end-time res)))
+        (if (or (> (:time game)
+                   (+ CONTINUE_SECS (:end-time res)))
+                (:error res))
           ;; enough, shut it down
           (do
             (quil/exit)
@@ -277,34 +286,41 @@
           game)))))
 
 (defn run-with-display
-  [game step]
-  (let [p (promise)]
-    (quil/sketch
-     :title "Bok"
-     :setup (fn []
-              (quil/frame-rate (/ (:dt-secs game)))
-              (merge bed/initial-state game))
-     :update (fn [game]
-               (gui-step game step))
-     :draw draw
-     :key-typed key-press
-     :mouse-pressed bed/mouse-pressed
-     :mouse-released bed/mouse-released
-     :mouse-dragged bed/mouse-dragged
-     :mouse-wheel bed/mouse-wheel
-     :size [1200 600]
-     :features [:resizable]
-     :middleware [quil.middleware/fun-mode]
-     :on-close (fn [state] (deliver p state)))
-    @p))
+  ([game step]
+     (run-with-display game step false))
+  ([game step fast?]
+     (let [p (promise)]
+       (quil/sketch
+        :title "Bok"
+        :setup (fn []
+                 (quil/frame-rate (if fast? 300 (/ (:dt-secs game))))
+                 (merge bed/initial-state game {::fast? fast?}))
+        :update (fn [game]
+                  (gui-step game step))
+        :draw draw
+        :key-typed key-press
+        :mouse-pressed bed/mouse-pressed
+        :mouse-released bed/mouse-released
+        :mouse-dragged bed/mouse-dragged
+        :mouse-wheel bed/mouse-wheel
+        :size [1200 600]
+        :features [:resizable]
+        :middleware [quil.middleware/fun-mode]
+        :on-close (fn [state] (deliver p state)))
+       @p)))
 
 (defn main
   [^ZMQ$Context ctx arena-type addrs opts]
   (runner/with-all-connected ctx ZMQ/REQ addrs
     (fn [socks]
-      (-> (runner/start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
-          (run-with-display runner/step-remote)
-          (runner/end-bout)))))
+      (let [b (->
+               (runner/start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
+               (run-with-display runner/step-remote false) ;;;;;;;;;;;;;;;;;
+               (runner/end-bout))
+            res (:final-result b)]
+        (println res)
+        (when-not (:error res)
+          (recur socks))))))
 
 (defn -main
   [arena-type & addrs]
@@ -313,9 +329,7 @@
     (assert (pos? (count addrs)))
     (println "connecting to" addrs)
     (try
-      (-> (main ctx arena-type addrs {})
-          :final-result
-          (println))
+      (main ctx arena-type addrs {})
       (finally
         (println "closing ZMQ context")
         (.term ctx)))))

@@ -128,7 +128,7 @@
 (defn final-result
   [game]
   (if-let [err (:error game)]
-    {:error err}
+    {:error err, :end-time (:time game)}
     (let [check-end (:check-end game)]
       (when-let [result (check-end game)]
         (println "total scene-deltas bytes:"
@@ -151,8 +151,8 @@
         ;; something
         )
       (let [winner (:winner result)
-            msg {:type :finished, :bout-id bout-id
-                 :winner winner}]
+            msg {:type :final-result, :bout-id bout-id
+                 :data result}]
         (doseq [[player-key sock] sockets]
           (send-msg sock msg)
           (assert (= :bye (:type (recv-msg sock)))))))
@@ -204,9 +204,14 @@
   [^ZMQ$Context ctx arena-type addrs opts]
   (with-all-connected ctx ZMQ/REQ addrs
     (fn [socks]
-      (-> (start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
-          (run-bout)
-          (end-bout)))))
+      (let [b (->
+               (start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
+               (run-bout)
+               (end-bout))
+            res (:final-result b)]
+        (println res)
+        (when-not (:error res)
+          (recur socks))))))
 
 (defn -main
   [arena-type & addrs]
@@ -215,9 +220,7 @@
     (assert (pos? (count addrs)))
     (println "connecting to" addrs)
     (try
-      (-> (main ctx arena-type addrs {})
-          :final-result
-          (println))
+      (main ctx arena-type addrs {})
       (finally
         (println "closing ZMQ context")
         (.term ctx)))))

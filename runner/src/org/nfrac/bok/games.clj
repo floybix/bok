@@ -96,14 +96,19 @@
 
 (def Inf Double/POSITIVE_INFINITY)
 
+(defn check-dead
+  [game]
+  (let [{:keys [dead-players player-keys]} game]
+    (if (and (seq dead-players)
+             (>= (count dead-players)
+                 (dec (count player-keys))))
+      {:winner (first (remove dead-players player-keys))})))
+
 (defn check-dead-or-time-limit
   [game]
   (if (>= (:time game) (or (:game-over-secs game) Inf))
     {:winner nil}
-    (let [{:keys [dead-players player-keys]} game]
-      (if (>= (count dead-players)
-              (dec (count player-keys)))
-        {:winner (first (remove dead-players player-keys))}))))
+    (check-dead game)))
 
 ;; =============================================================================
 
@@ -240,7 +245,12 @@
    (assoc
        :game-type :altitude
        :entities entities
-       :check-end check-highest)
+       :game-step (fn [game]
+                    (-> (world-step game)
+                        (eliminate-fallen -20)))
+       :check-end (fn [game]
+                    (or (check-dead game)
+                        (check-highest game))))
    (add-players players starting-pts)))
 
 ;; =============================================================================

@@ -40,30 +40,31 @@
    `peek-ref` stores state for any active bouts, in a map keyed by
    bout id."
   [socket ident action-fn peek-ref]
-  (let [bouts peek-ref]
-    (while true
-      (let [msg (recv-msg socket)]
-        (case (:type msg)
-          :identify (send-msg socket {:type :ident
-                                      :data ident})
-          :invite (let [bout-id (:bout-id msg)]
-                    (send-msg socket {:type :join
-                                      :bout-id bout-id})
-                    (swap! bouts assoc bout-id {}))
-          :react (let [bout-id (:bout-id msg)
-                       last-state (@bouts bout-id)
-                       state (-> last-state
-                                 (update-in [:current]
-                                            patch (:data msg))
-                                 (action-fn))
-                       actions (:actions state)]
-                   (send-msg socket {:type :actions
-                                     :data actions})
-                   (swap! bouts assoc bout-id state))
-          :finished (let [bout-id (:bout-id msg)]
-                      (send-msg socket {:type :bye})
-                      (swap! bouts dissoc bout-id))
-          (println "Unrecognised message type:" msg))))))
+  (loop []
+    (let [msg (recv-msg socket)
+          bouts peek-ref]
+      (case (:type msg)
+        :identify (send-msg socket {:type :ident
+                                    :data ident})
+        :invite (let [bout-id (:bout-id msg)]
+                  (send-msg socket {:type :join
+                                    :bout-id bout-id})
+                  (swap! bouts assoc bout-id {}))
+        :react (let [bout-id (:bout-id msg)
+                     last-state (@bouts bout-id)
+                     state (-> last-state
+                               (update-in [:current]
+                                          patch (:data msg))
+                               (action-fn))
+                     actions (:actions state)]
+                 (send-msg socket {:type :actions
+                                   :data actions})
+                 (swap! bouts assoc bout-id state))
+        :final-result (let [bout-id (:bout-id msg)]
+                        (send-msg socket {:type :bye})
+                        (swap! bouts dissoc bout-id))
+        (println "Unrecognised message type:" msg))
+      (recur))))
 
 (defn start-server
   [port ident action-fn peek-ref]
