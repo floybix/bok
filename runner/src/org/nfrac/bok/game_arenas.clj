@@ -66,8 +66,7 @@
 
 (defn mayan
   [world]
-  (let [step-pts []
-        outer-x 15.0
+  (let [outer-x 15.0
         summit-h 8.0
         steps-y 2.0
         step-radius (fn [y] (+ 0.5 (- summit-h y)))
@@ -123,6 +122,139 @@
      (games/hunt-game world entities players starting-pts)
      (assoc :game-version [0 0 1]
             :camera {:width 40 :height 20 :center [0 7]}))))
+
+;; =============================================================================
+;; ## playbox
+;;
+;; Arena designed for baby-like learning.
+
+(defn playbox
+  [world]
+  (let [outer-x 20.0
+        ceil-y 18
+        ceiling (simple-entity
+                 [[(- outer-x) 0] [outer-x 0]]
+                 (body! world {:type :static
+                               :position [0 ceil-y]}
+                        {:shape (edge [(- outer-x) 0] [outer-x 0])}))
+        left-wall (simple-entity
+                   [[0 0] [0 ceil-y]]
+                   (body! world {:type :static
+                                 :position [(- outer-x) 0]}
+                          {:shape (edge [0 0] [0 ceil-y])}))
+        right-wall (simple-entity
+                    [[0 0] [0 ceil-y]]
+                    (body! world {:type :static
+                                  :position [outer-x 0]}
+                           {:shape (edge [0 0] [0 ceil-y])}))
+        ground-pts [[-20 3.0]
+                    [-19 2.5]
+                    [-18.8 2.6]
+                    [-18 2.0]
+                    [-17.8 2.1]
+                    [-17 1.5]
+                    [-16.8 1.6]
+                    [-16 1.0]
+                    [-15.8 1.1]
+                    [-15 0.5]
+                    [-14.8 0.6]
+                    [-14 0]
+                    [-4 0]
+                    [-2 1]
+                    [0 0]
+                    [6 0]
+                    [6 -2]
+                    [12 0]
+                    [12 0.5]
+                    [13 0.5]
+                    [13 1]
+                    [14 1]
+                    [14 1.5]
+                    [15 1.5]
+                    [15 2]
+                    [16 2]
+                    [16 2.5]
+                    [17 2.5]
+                    [17 3.0]
+                    [18 3.0]
+                    [18 3.5]
+                    [20 3.5]]
+        ground (simple-entity
+                ground-pts
+                (body! world {:type :static}
+                       {:shape (edge-chain ground-pts)
+                        :friction 1}))
+        block-fx {:shape (box 0.5 0.5)
+                  :density 2
+                  :friction 1}
+        block-pois [[-0.5 0.5]
+                    [0.5 0.5]
+                    [0.5 -0.5]
+                    [-0.5 -0.5]]
+        blocks (for [[pos kw] [[[7.0 6.5] :block-1]
+                               [[7.5 6.5] :block-2]
+                               [[7.25 7.0] :block-3]]]
+                 [kw (simple-entity
+                      block-pois
+                      (body! world {:position pos}
+                             block-fx)
+                      :entity-type :movable)])
+        plat-fx {:shape (edge [-2 0] [2 0])
+                 :friction 1}
+        plat-pois [[-2 0] [2 0]]
+        plats (for [[pos kw] [[[-15 8] :plat-left]
+                              [[-9 9] :plat-midleft]
+                              [[12 4.5] :plat-loright]
+                              [[16 8] :plat-hiright]
+                              [[8 6] :plat-midright]]]
+                [kw (simple-entity
+                     plat-pois
+                     (body! world {:type :static
+                                   :position pos}
+                            plat-fx))])
+        ;; 5m up, 0.5m right
+        ladder-pois (for [y (range 0 5.01)]
+                      [0.5 y])
+        ladder (simple-entity
+                ladder-pois
+                (apply body! world {:type :static
+                                    :position [(+ (- outer-x) 0.15) 3.5]}
+                       ;; surface in front of wall for raycast perception
+                       {:shape (edge [0 -0.5] [0 5.5])}
+                       (for [poi ladder-pois]
+                         {:shape (edge poi (v-add poi [-0.5 -0.1]))
+                          :friction 1})))
+        hold-fx {:shape (circle 0.2)
+                 :friction 1}
+        holds (for [[pos kw] [[[-6.5 12.5] :hold-1]
+                              [[-3.0 13.0] :hold-2]
+                              [[0.5 13.5] :hold-3]
+                              [[4.0 15.0] :hold-4]
+                              [[7.5 14.0] :hold-5]
+                              [[11.0 13.0] :hold-6]
+                              [[14.5 12.0] :hold-7]
+                              ]]
+                [kw (simple-entity
+                     [[0 0]]
+                     (body! world {:position pos
+                                   :type :static}
+                            hold-fx))]) 
+        entities (into {:ground ground
+                        :left-wall left-wall
+                        :right-wall right-wall
+                        :ladder ladder}
+                       (concat blocks plats holds))
+        starting-pts [[-10 2] [10 2]]]
+    [entities starting-pts]))
+
+(defmethod build* :playbox-altitude
+  [_ players _]
+  (let [world (new-world)
+        [entities starting-pts] (playbox world)]
+    (->
+     (games/altitude-game world entities players starting-pts)
+     (assoc :game-version [0 0 1]
+            :camera {:width 42 :height 20 :center [0 8]}))))
 
 ;; =============================================================================
 ;; ## climbly
