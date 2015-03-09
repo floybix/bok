@@ -5,8 +5,8 @@
         :url "https://github.com/floybix/bok"}
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.nfrac/cljbox2d "0.4.1-SNAPSHOT"]
-                 [org.nfrac/cljbox2d.testbed "0.4.1-SNAPSHOT"]
+  :dependencies [[org.nfrac/cljbox2d "0.5.0"]
+                 [org.nfrac/cljbox2d.testbed "0.5.0"]
                  [org.zeromq/jeromq "0.3.4"]
                  [com.cognitect/transit-clj "0.8.259"]
                  [org.clojure/clojure "1.6.0"]]
