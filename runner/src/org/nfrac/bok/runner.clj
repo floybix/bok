@@ -105,7 +105,7 @@
   (let [prev-scene (:current-scene game {})
         new-scene (snapshot-scene game prev-scene)
         scened (diff/diff prev-scene new-scene)]
-    (-> (update-in game [:scene-deltas] conj scened)
+    (-> (update-in game [:scene-deltas] #(conj (or % []) scened))
         (assoc :current-scene new-scene))))
 
 (defn step-remote

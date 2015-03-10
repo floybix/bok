@@ -14,12 +14,13 @@
    the Bok use case involves lots of position vectors [x y] which
    always change together; sequence diffs are counter productive."
   [state new-state]
-  (loop [[k & ks] (distinct (concat (keys state)
-                                    (keys new-state)))
+  (loop [more-ks (distinct (concat (keys state)
+                                   (keys new-state)))
          m (transient {})]
-    (if-not k
+    (if (empty? more-ks)
       (persistent! m)
-      (let [old-val (get state k)
+      (let [[k & ks] more-ks
+            old-val (get state k)
             new-val (get new-state k)]
         (cond (= old-val new-val)
               (recur ks m)

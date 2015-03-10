@@ -8,6 +8,7 @@
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil :refer [color fill stroke]]
             [quil.middleware]
+            [org.nfrac.bok.tree-diff :as diff]
             [clojure.java.io :as io])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]))
 
@@ -230,7 +231,7 @@
       state
       (let [follow-player (nth (seq (:player-keys state))
                                (dec idx))
-            [px py] (-> state :entities follow-player :components :head position)
+            [px py] (-> state :current-scene :bodies follow-player :head :position)
             {:keys [width height]} (:camera state)]
         (update-in state [:camera :center]
                    (fn [[x y]]
@@ -322,3 +323,54 @@
         (println res)
         (when (and (:repeat opts) (not (:error res)))
           (recur socks))))))
+
+(defn replay-game
+  [saved-game-data]
+  (let [[game-meta deltas] saved-game-data
+        dt-secs (:dt-secs (first deltas))
+        init-state (-> (assoc bed/initial-state
+                         :current-scene (first deltas)
+                         :more-deltas (next deltas)
+                         :dt-secs dt-secs
+                         :player-keys (:player-keys (first deltas)))
+                       (record-snapshot))
+        step (fn [state]
+               (-> state
+                   ;; will be picked up by record-snapshot
+                   (update-in [:current-scene] diff/patch
+                              (first (:more-deltas state)))
+                   (update-in [:more-deltas] next)
+                   (update-in [:time] + dt-secs)))]
+    (println game-meta)
+    (quil/sketch
+     :title "Bok (replay)"
+     :setup (fn []
+              (quil/frame-rate (/ dt-secs))
+              init-state)
+     :update (fn [game]
+               (if (:paused? game)
+                 (camera-follow game)
+                 (let [game (-> (step game)
+                                (camera-follow)
+                                (record-snapshot)
+                                (assoc :stepping? false
+                                       :paused? (:stepping? game)))]
+                   (when-not (:more-deltas game)
+                     (quil/exit))
+                   game)))
+     :draw draw
+     :key-typed key-press
+     :mouse-pressed bed/mouse-pressed
+     :mouse-released bed/mouse-released
+     :mouse-dragged bed/mouse-dragged
+     :mouse-wheel bed/mouse-wheel
+     :size [1200 600]
+     :features [:resizable]
+     :middleware [quil.middleware/fun-mode]
+     )))
+
+(defn replay-game-from-file
+  [file]
+  (with-open [out (java.io.ByteArrayOutputStream.)]
+    (io/copy (io/file file) out)
+    (replay-game (runner/from-transit (.toByteArray out)))))

@@ -16,7 +16,8 @@
     :default 60
     :parse-fn #(let [i (Integer/parseInt %)] (when (pos? i) i))]
    ["-o" "--save-out FILE" "File to save the game recording to."
-    :default "game.bok"]]
+    :default "game.bok"]
+   [nil "--replay FILE" "Just replay a recorded game from file."]]
   )
 
 (defn usage [options-summary]
@@ -52,21 +53,23 @@
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)
         [game-id & addrs] arguments
         game-id (keyword game-id)]
-    ;; Handle help and error conditions
+    ;; handle help and error conditions
     (cond
      (:help options) (exit 0 (usage summary))
-     (< (count arguments) 1) (exit 1 (usage summary))
-     errors (exit 1 (error-msg errors))
-     (not (get (known-game-ids) game-id)) (exit 1 (error-msg
-                                                   [(str "Unknown game " game-id)])))
-    (let [ctx (ZMQ/context 1)
-          options (set/rename-keys options
-                                   {:time-limit :game-over-secs})]
-      (try
-        (println options)
-        (if (:no-vis options)
-          (runner/main ctx game-id addrs options)
-          (vrunner/main ctx game-id addrs options)
-          )
-        (finally
-          (.term ctx))))))
+     (and (not game-id) (not (:replay options))) (exit 1 (usage summary))
+     errors (exit 1 (error-msg errors)))
+    ;; replay is different
+    (if (:replay options)
+      (vrunner/replay-game-from-file (:replay options))
+      ;; actual run
+      (let [options (set/rename-keys options
+                                     {:time-limit :game-over-secs})]
+        (when (not (get (known-game-ids) game-id))
+          (exit 1 (error-msg [(str "Unknown game " game-id)])))
+        (let [ctx (ZMQ/context 1)]
+          (try
+            (if (:no-vis options)
+              (runner/main ctx game-id addrs options)
+              (vrunner/main ctx game-id addrs options))
+            (finally
+              (.term ctx))))))))
