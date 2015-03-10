@@ -37,7 +37,7 @@ human-designed solutions.
 
 Get [Leiningen](http://leiningen.org/) first.
 
-You can run some in-process demos:
+You can run some really stupid in-process demos:
 
 ```
 cd bok/runner
@@ -48,14 +48,20 @@ lein run -m org.nfrac.bok.tests.bipoid bowl-energy-race
 lein run -m org.nfrac.bok.tests.bipoid cavern-hunt
 ```
 
-Or try running player servers communicating over TCP:
+Start up some players communicating over TCP:
 
 ```
 cd bok/players/clojure
 lein run -m org.nfrac.bok.examples.bipoid1 5555
 lein run -m org.nfrac.bok.examples.humanoid1 5556
 cd bok/runner
-lein run -m org.nfrac.bok.visual-runner sumo tcp://localhost:5555 tcp://localhost:5556
+lein run sumo tcp://localhost:5555 tcp://localhost:5556
+```
+
+See command line options for the runner:
+
+```
+lein run
 ```
 
 Or use the Clojure REPL: see

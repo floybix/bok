@@ -160,12 +160,16 @@
   (fn [game-id players opts]
     game-id))
 
+(defn known-game-ids
+  []
+  (set (keys (methods build*))))
+
 (defn build
   "Returns a Game record for the named `game-id`, assuming a
    corresponding multimethod of `build*` has been registered. Argument
    `players` should be a map of player id keywords to their creature
    type (see `creatures/build`). The `opts` map is passed to the game
-   build method. Pass key `:game-over-secs` to override its default.
+   build method and also merged into the game record.
 
    This wrapper function sets user-data on all Bodies with their
    entity and components keys in `:org.nfrac.bok/entity` and
@@ -178,13 +182,12 @@
       (vary-user-data cmp assoc
                       :org.nfrac.bok/entity ent-k
                       :org.nfrac.bok/component cmp-k))
-    (cond->
+    (->
      (assoc game
        :game-id game-id
        :gravity (gravity (:world game)))
-     ;; allow options map to override the game timeout
-     (contains? opts :game-over-secs)
-     (assoc :game-over-secs (:game-over-secs opts)))))
+     ;; store options (e.g. override the game timeout)
+     (merge opts))))
 
 ;; =============================================================================
 ;; ## game-type :sumo

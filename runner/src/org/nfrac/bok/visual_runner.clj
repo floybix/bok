@@ -7,7 +7,8 @@
                                               v-sub v-angle v-mag abs]]
             [org.nfrac.cljbox2d.testbed :as bed]
             [quil.core :as quil :refer [color fill stroke]]
-            [quil.middleware])
+            [quil.middleware]
+            [clojure.java.io :as io])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]))
 
 (defn mean
@@ -310,26 +311,14 @@
        @p)))
 
 (defn main
-  [^ZMQ$Context ctx arena-type addrs opts]
+  [^ZMQ$Context ctx game-id addrs opts]
   (runner/with-all-connected ctx ZMQ/REQ addrs
     (fn [socks]
       (let [b (->
-               (runner/start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
-               (run-with-display runner/step-remote false) ;;;;;;;;;;;;;;;;;
+               (runner/start-bout game-id (zipmap PLAYER_KEYS socks) opts)
+               (run-with-display runner/step-remote (:fast-vis opts))
                (runner/end-bout))
             res (:final-result b)]
         (println res)
-        (when-not (:error res)
+        (when (and (:repeat opts) (not (:error res)))
           (recur socks))))))
-
-(defn -main
-  [arena-type & addrs]
-  (let [ctx (ZMQ/context 1)
-        arena-type (keyword arena-type)]
-    (assert (pos? (count addrs)))
-    (println "connecting to" addrs)
-    (try
-      (main ctx arena-type addrs {})
-      (finally
-        (println "closing ZMQ context")
-        (.term ctx)))))

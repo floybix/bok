@@ -3,7 +3,9 @@
             [org.nfrac.bok.game-arenas] ;; load games
             [org.nfrac.bok.tree-diff :as diff]
             [org.nfrac.cljbox2d.core :as core]
-            [cognitect.transit :as transit])
+            [cognitect.transit :as transit]
+            [clojure.java.io :as io]
+            [clojure.tools.cli :refer [parse-opts]])
   (:import [org.zeromq ZMQ ZMQ$Context ZMQ$Socket ZMQException]
            [java.io ByteArrayInputStream ByteArrayOutputStream]))
 
@@ -131,8 +133,6 @@
     {:error err, :end-time (:time game)}
     (let [check-end (:check-end game)]
       (when-let [result (check-end game)]
-        (println "total scene-deltas bytes:"
-                 (count (to-transit (:scene-deltas game))))
         (assoc result :end-time (:time game))))))
 
 (defn run-bout
@@ -141,6 +141,12 @@
     (if-let [res (final-result game)]
       (assoc game :final-result res)
       (recur (step-remote game)))))
+
+(defn saved-game-data
+  [scene-deltas]
+  (let [game-meta {:timestamp (java.util.Date.)
+                   :bok-version [0 0 1]}]
+    (list game-meta scene-deltas)))
 
 (defn end-bout
   [game]
@@ -153,13 +159,16 @@
       (let [winner (:winner result)
             msg {:type :final-result, :bout-id bout-id
                  :data result}]
+        (when-let [file (:save-out game)]
+          (let [data (saved-game-data (:scene-deltas game))]
+            (io/copy (to-transit data) (io/file file))))
         (doseq [[player-key sock] sockets]
           (send-msg sock msg)
           (assert (= :bye (:type (recv-msg sock)))))))
     game))
 
 (defn start-bout
-  [arena-type sockmap opts]
+  [game-id sockmap opts]
   (let [bout-id (str (java.util.UUID/randomUUID))]
     (println "inviting to bout" bout-id)
     (doseq [[k sock] sockmap]
@@ -176,7 +185,7 @@
                         sockmap)
           creature-types (remap :creature-type idents)]
       (println idents)
-      (-> (games/build arena-type creature-types opts)
+      (-> (games/build game-id creature-types opts)
           (assoc :bout-id bout-id
                  :idents idents
                  :sockets sockmap)))))
@@ -201,26 +210,14 @@
   (map #(keyword (str "player-" %)) [\a \b \c \d \e \f \g \h \i \j]))
 
 (defn main
-  [^ZMQ$Context ctx arena-type addrs opts]
+  [^ZMQ$Context ctx game-id addrs opts]
   (with-all-connected ctx ZMQ/REQ addrs
     (fn [socks]
       (let [b (->
-               (start-bout arena-type (zipmap PLAYER_KEYS socks) opts)
+               (start-bout game-id (zipmap PLAYER_KEYS socks) opts)
                (run-bout)
                (end-bout))
             res (:final-result b)]
         (println res)
-        (when-not (:error res)
+        (when (and (:repeat opts) (not (:error res)))
           (recur socks))))))
-
-(defn -main
-  [arena-type & addrs]
-  (let [ctx (ZMQ/context 1)
-        arena-type (keyword arena-type)]
-    (assert (pos? (count addrs)))
-    (println "connecting to" addrs)
-    (try
-      (main ctx arena-type addrs {})
-      (finally
-        (println "closing ZMQ context")
-        (.term ctx)))))
