@@ -5,12 +5,10 @@
         :url "https://github.com/floybix/bok"}
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.nfrac/cljbox2d "0.5.0"]
-                 [org.nfrac/cljbox2d.testbed "0.5.0"]
-                 [org.zeromq/jeromq "0.3.4"]
-                 [com.cognitect/transit-clj "0.8.259"]
-                 [org.clojure/tools.cli "0.3.1"]
-                 [org.clojure/clojure "1.6.0"]]
+  :plugins [[lein-tools-deps "0.4.1"]]
+  :middleware [lein-tools-deps.plugin/resolve-dependencies-with-deps-edn]
+  :lein-tools-deps/config {:config-files [:install :user :project]}
+
   :main org.nfrac.bok.main
   ;:jvm-opts ^:replace ["-server" "-XX:+UseConcMarkSweepGC"]
   )

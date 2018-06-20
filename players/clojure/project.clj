@@ -3,6 +3,7 @@
   :url "https://github.com/floybix/bok"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.zeromq/jeromq "0.3.4"]
-                 [com.cognitect/transit-clj "0.8.259"]
-                 [org.clojure/clojure "1.6.0"]])
+  :plugins [[lein-tools-deps "0.4.1"]]
+  :middleware [lein-tools-deps.plugin/resolve-dependencies-with-deps-edn]
+  :lein-tools-deps/config {:config-files [:install :user :project]}
+  )

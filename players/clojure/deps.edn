@@ -1,0 +1,4 @@
+{:deps
+ {com.cognitect/transit-clj {:mvn/version "0.8.259"}
+  org.zeromq/jeromq {:mvn/version "0.3.4"}
+  }}
