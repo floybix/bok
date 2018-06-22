@@ -35,10 +35,8 @@
     (merge-with patch m diff)
     diff))
 
-(defn run-server
-  "Receives messages on the socket in an infinite loop. The atom
-   `peek-ref` stores state for any active bouts, in a map keyed by
-   bout id."
+(defn run-one-bout
+  "Returns the final result of the bout."
   [socket ident action-fn peek-ref]
   (loop []
     (let [msg (recv-msg socket)
@@ -64,7 +62,18 @@
                         (send-msg socket {:type :bye})
                         (swap! bouts dissoc bout-id))
         (println "Unrecognised message type:" msg))
-      (recur))))
+      (if (= :final-result (:type msg))
+        (:data msg)
+        (recur)))))
+
+(defn run-server
+  "Receives messages on the socket in an infinite loop. The atom
+   `peek-ref` stores state for any active bouts, in a map keyed by
+   bout id."
+  [socket ident action-fn peek-ref]
+  (loop []
+    (run-one-bout socket ident action-fn peek-ref)
+    (recur)))
 
 (defn start-server
   [port ident action-fn peek-ref]
