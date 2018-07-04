@@ -36,20 +36,23 @@
     diff))
 
 (defn run-one-bout
-  "Returns the final result of the bout."
+  "Returns the final result of the bout. The last scene is also included
+  under key :last-scene."
   [socket ident action-fn peek-ref]
-  (loop []
-    (let [msg (recv-msg socket)
-          bouts peek-ref]
+  (loop [bouts @peek-ref]
+    (let [msg (recv-msg socket)]
+      (reset! peek-ref bouts)
       (case (:type msg)
-        :identify (send-msg socket {:type :ident
-                                    :data ident})
+        :identify (do
+                    (send-msg socket {:type :ident
+                                      :data ident})
+                    (recur bouts))
         :invite (let [bout-id (:bout-id msg)]
                   (send-msg socket {:type :join
                                     :bout-id bout-id})
-                  (swap! bouts assoc bout-id {}))
+                  (recur (assoc bouts bout-id {})))
         :react (let [bout-id (:bout-id msg)
-                     last-state (@bouts bout-id)
+                     last-state (bouts bout-id)
                      state (-> last-state
                                (update-in [:current]
                                           patch (:data msg))
@@ -57,14 +60,13 @@
                      actions (:actions state)]
                  (send-msg socket {:type :actions
                                    :data actions})
-                 (swap! bouts assoc bout-id state))
+                 (recur (assoc bouts bout-id state)))
         :final-result (let [bout-id (:bout-id msg)]
                         (send-msg socket {:type :bye})
-                        (swap! bouts dissoc bout-id))
-        (println "Unrecognised message type:" msg))
-      (if (= :final-result (:type msg))
-        (:data msg)
-        (recur)))))
+                        (swap! peek-ref dissoc bout-id)
+                        (-> (:data msg)
+                            (assoc :last-scene (bouts bout-id))))
+        (println "Unrecognised message type:" msg)))))
 
 (defn run-server
   "Receives messages on the socket in an infinite loop. The atom
