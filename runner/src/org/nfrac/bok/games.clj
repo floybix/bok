@@ -134,12 +134,12 @@
   "Creates entities for each given player and adds them to the world
    and the game record. `players` is a map from player keywords to a
    creature type. `starting-pts` is a sequence of [x y] ground
-   positions."
+   positions to be assigned to players by order of key."
   [game players starting-pts]
   (let [world (:world game)
-        es (map (fn [player-type pt i]
+        es (map (fn [[_ player-type] pt i]
                   (creatures/build player-type world pt (- (inc i))))
-                (vals players)
+                (sort players)
                 starting-pts
                 (range))]
     (-> game

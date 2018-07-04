@@ -312,17 +312,20 @@
        @p)))
 
 (defn main
-  [^ZMQ$Context ctx game-id addrs opts]
-  (runner/with-all-connected ctx ZMQ/REQ addrs
-    (fn [socks]
-      (let [b (->
-               (runner/start-bout game-id (zipmap PLAYER_KEYS socks) opts)
-               (run-with-display runner/step-remote (:fast-vis opts))
-               (runner/end-bout))
-            res (:final-result b)]
-        (println res)
-        (when (and (:repeat opts) (not (:error res)))
-          (recur socks))))))
+  ([game-id addrs opts]
+   (main (ZMQ/context 1) game-id addrs opts))
+  ([^ZMQ$Context ctx game-id addrs opts]
+   (runner/with-all-connected ctx ZMQ/REQ addrs
+     (fn [socks]
+       (let [b (->
+                (runner/start-bout game-id (zipmap PLAYER_KEYS socks) opts)
+                (run-with-display runner/step-remote (:fast-vis opts))
+                (runner/end-bout))
+             res (:final-result b)]
+         (when-not (:quiet? opts)
+           (println res))
+         (when (and (:repeat opts) (not (:error res)))
+           (recur socks)))))))
 
 (defn replay-game
   [saved-game-data]

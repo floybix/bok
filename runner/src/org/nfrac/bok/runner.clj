@@ -117,6 +117,8 @@
           (take-remote-actions)
           (record-scene))
       (catch ZMQException e
+        (assoc game :error e))
+      (catch IllegalStateException e
         (assoc game :error e)))))
 
 (defn step-local
@@ -162,29 +164,37 @@
         (when-let [file (:save-out game)]
           (let [data (saved-game-data (:scene-deltas game))]
             (io/copy (to-transit data) (io/file file))))
-        (doseq [[player-key sock] sockets]
-          (send-msg sock msg)
+        (doseq [[player-key sock] sockets
+                :let [my-msg (assoc-in msg [:data :my-result]
+                                       (case winner
+                                         nil :draw
+                                         player-key :win
+                                         :loss))]]
+          (send-msg sock my-msg)
           (assert (= :bye (:type (recv-msg sock)))))))
     game))
 
 (defn start-bout
   [game-id sockmap opts]
   (let [bout-id (str (java.util.UUID/randomUUID))]
-    (println "inviting to bout" bout-id)
+    (when-not (:quiet? opts)
+      (println "inviting to bout" bout-id))
     (doseq [[k sock] sockmap]
       (send-msg sock {:type :invite, :bout-id bout-id}))
     (doseq [[k ^ZMQ$Socket sock] sockmap]
       (assert (= :join (:type (recv-msg sock))))
       (.setSendTimeOut sock 1000)
       (.setReceiveTimeOut sock 1000))
-    (println "identifying players.")
+    (when-not (:quiet? opts)
+      (println "identifying players."))
     (doseq [[k sock] sockmap]
       (send-msg sock {:type :identify}))
     (let [idents (remap (fn [sock]
                           (:data (recv-msg sock)))
                         sockmap)
           creature-types (remap :creature-type idents)]
-      (println idents)
+      (when-not (:quiet? opts)
+        (println idents))
       (-> (games/build game-id creature-types opts)
           (assoc :bout-id bout-id
                  :idents idents
@@ -210,14 +220,17 @@
   (map #(keyword (str "player-" %)) [\a \b \c \d \e \f \g \h \i \j]))
 
 (defn main
-  [^ZMQ$Context ctx game-id addrs opts]
-  (with-all-connected ctx ZMQ/REQ addrs
-    (fn [socks]
-      (let [b (->
-               (start-bout game-id (zipmap PLAYER_KEYS socks) opts)
-               (run-bout)
-               (end-bout))
-            res (:final-result b)]
-        (println res)
-        (when (and (:repeat opts) (not (:error res)))
-          (recur socks))))))
+  ([game-id addrs opts]
+   (main (ZMQ/context 1) game-id addrs opts))
+  ([^ZMQ$Context ctx game-id addrs opts]
+   (with-all-connected ctx ZMQ/REQ addrs
+     (fn [socks]
+       (let [b (->
+                (start-bout game-id (zipmap PLAYER_KEYS socks) opts)
+                (run-bout)
+                (end-bout))
+             res (:final-result b)]
+         (when-not (:quiet? opts)
+           (println res))
+         (when (and (:repeat opts) (not (:error res)))
+           (recur socks)))))))
